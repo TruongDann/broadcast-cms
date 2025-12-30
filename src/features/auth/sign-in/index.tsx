@@ -1,0 +1,69 @@
+import { Logo } from '@/assets/logo'
+import { cn } from '@/lib/utils'
+import dashboardDark from './assets/dashboard-dark.png'
+import dashboardLight from './assets/dashboard-light.png'
+import { UserAuthForm } from './components/user-auth-form'
+
+export function SignIn() {
+  return (
+    <div className='relative container grid h-svh flex-col items-center justify-center lg:max-w-none lg:grid-cols-2 lg:px-0'>
+      <div className='flex h-full items-center p-4 lg:p-8'>
+        <div className='mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[400px]'>
+          <div className='flex flex-col space-y-2'>
+            {/* <div className='flex items-center justify-around'>
+              <Logo className='me-2' />
+            </div> */}
+            <h1 className='text-2xl font-bold tracking-tight'>
+              Chào mừng trở lại
+            </h1>
+            <p className='text-sm text-muted-foreground'>
+              Nhập thông tin xác thực để truy cập không gian làm việc.
+            </p>
+          </div>
+
+          <UserAuthForm />
+
+          <p className='px-8 text-center text-xs text-muted-foreground'>
+            Bằng việc đăng nhập, bạn đồng ý với{' '}
+            <a
+              href='/terms'
+              className='underline underline-offset-4 transition-colors hover:text-primary'
+            >
+              Điều khoản
+            </a>{' '}
+            và{' '}
+            <a
+              href='/privacy'
+              className='underline underline-offset-4 transition-colors hover:text-primary'
+            >
+              Chính sách bảo mật
+            </a>
+            .
+          </p>
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          'relative h-full overflow-hidden bg-muted max-lg:hidden',
+          '[&>img]:absolute [&>img]:top-[15%] [&>img]:left-20 [&>img]:h-full [&>img]:w-full [&>img]:object-cover [&>img]:object-top-left [&>img]:select-none'
+        )}
+      >
+        <img
+          src={dashboardLight}
+          className='dark:hidden'
+          width={1024}
+          height={1151}
+          alt='Shadcn-Admin'
+        />
+        <img
+          src={dashboardDark}
+          className='hidden dark:block'
+          width={1024}
+          height={1138}
+          alt='Shadcn-Admin'
+        />
+      </div>
+    </div>
+  )
+}
