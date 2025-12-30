@@ -143,6 +143,24 @@ export function TopicsPage() {
 
   return (
     <div className='space-y-6'>
+      {/* Page Header */}
+      <div className='flex flex-wrap items-end justify-between gap-2'>
+        <div className='flex flex-col items-start'>
+          <h2 className='text-3xl font-bold tracking-tight'>Quản lý Đề tài</h2>
+          <p className='text-muted-foreground'>
+            Quản lý và theo dõi tiến độ thực hiện các đề tài.
+          </p>
+        </div>
+        <div className='flex gap-2'>
+          <Button asChild>
+            <Link to='/topics/register'>
+              <Plus className='mr-2 h-4 w-4' />
+              Đăng ký Đề tài
+            </Link>
+          </Button>
+        </div>
+      </div>
+
       {/* Stats Cards - Enhanced with trends */}
       <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
         <StatCard
