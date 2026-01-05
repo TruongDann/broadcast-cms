@@ -1,25 +1,55 @@
 import { useState, useMemo } from 'react'
-import { Link } from '@tanstack/react-router'
-import {
-  Plus,
-  TrendingUp,
-  TrendingDown,
-  Settings2,
-} from 'lucide-react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { Plus, TrendingUp, TrendingDown, Settings2 } from 'lucide-react'
 import { useAuthStore, hasRole } from '@/stores/auth-store'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import type { TopicResponse } from './api/topics-api'
 import { TopicTable } from './components/topic-table'
 import { TopicsChart } from './components/topics-chart'
-import {
-  mockTopics,
-  getTopicsByUser,
-  getTopicsByDepartment,
-  getTopicStats,
-} from './data/mock-topics'
+import { useTopics, useTopicStats } from './hooks/use-topics'
 import { type Topic } from './types'
+
+// Helper to convert API response to Topic type
+function toTopic(t: TopicResponse): Topic {
+  return {
+    id: t.id,
+    title: t.title,
+    outline: t.outline || '',
+    contentType: t.contentType,
+    teamMembers: t.teamMembers.map((m) => ({
+      userId: m.userId,
+      userName: m.userName,
+      role: m.role as
+        | 'admin'
+        | 'leadership'
+        | 'editor'
+        | 'reporter'
+        | 'technician',
+      position: m.position,
+    })),
+    attachments: t.attachments.map((a) => ({
+      id: a.id,
+      fileName: a.fileName,
+      fileUrl: a.fileUrl,
+      fileType: a.fileType,
+      fileSize: a.fileSize,
+      uploadedAt: new Date(a.uploadedAt),
+    })),
+    estimatedDays: t.estimatedDays,
+    deadline: t.deadline ? new Date(t.deadline) : undefined,
+    createdBy: t.createdBy,
+    createdByName: t.createdByName || '',
+    departmentId: t.departmentId || '',
+    departmentName: t.departmentName || '',
+    status: t.status as Topic['status'],
+    approvalHistory: [],
+    createdAt: new Date(t.createdAt),
+    updatedAt: new Date(t.updatedAt),
+  }
+}
 
 // Stat card component with trend indicator
 interface StatCardProps {
@@ -33,30 +63,25 @@ interface StatCardProps {
   trendText?: string
 }
 
-function StatCard({
-  title,
-  value,
-  subtitle,
-  trend,
-  trendText,
-}: StatCardProps) {
+function StatCard({ title, value, subtitle, trend, trendText }: StatCardProps) {
   return (
-    <Card className='bg-card border-border'>
+    <Card className='border-border bg-card'>
       <CardContent>
         {/* Header: Title + Badge */}
         <div className='flex items-center justify-between'>
           <span className='text-sm text-muted-foreground'>{title}</span>
           {trend && (
-            <Badge variant='outline' className='gap-1 border-muted-foreground/30 bg-transparent px-2 py-0.5'>
+            <Badge
+              variant='outline'
+              className='gap-1 border-muted-foreground/30 bg-transparent px-2 py-0.5'
+            >
               {trend.isPositive ? (
                 <TrendingUp className='h-3 w-3 text-muted-foreground' />
               ) : (
                 <TrendingDown className='h-3 w-3 text-muted-foreground' />
               )}
               <span
-                className={
-                  trend.isPositive ? 'text-green-500' : 'text-red-500'
-                }
+                className={trend.isPositive ? 'text-green-500' : 'text-red-500'}
               >
                 {trend.isPositive ? '+' : ''}
                 {trend.value}%
@@ -90,6 +115,19 @@ function StatCard({
 export function TopicsPage() {
   const { user } = useAuthStore()
   const [selectedTab, setSelectedTab] = useState<string>('all')
+  const navigate = useNavigate()
+
+  // Fetch topics from API
+  const { data: topicsData } = useTopics()
+
+  // Fetch topic statistics from API
+  const { data: apiStats } = useTopicStats()
+
+  // Convert API data to Topic type
+  const allTopics = useMemo(() => {
+    if (!topicsData?.topics) return []
+    return topicsData.topics.map(toTopic)
+  }, [topicsData])
 
   // Filter topics based on user role
   const filteredTopics = useMemo(() => {
@@ -97,25 +135,23 @@ export function TopicsPage() {
 
     // Admin and Leadership can see all
     if (hasRole(user, ['admin', 'leadership'])) {
-      return mockTopics
+      return allTopics
     }
 
     // Editor can see their department
     if (user.role === 'editor') {
-      return getTopicsByDepartment(user.departmentId || '')
+      return allTopics.filter((t) => t.departmentId === user.departmentId)
     }
 
     // Reporter/Technician can only see their own
-    return getTopicsByUser(user.id)
-  }, [user])
+    return allTopics.filter((t) => t.createdBy === user.id)
+  }, [user, allTopics])
 
-  // Get topics by tab filter
+  // Get topics by tab filter (updated for single-step approval)
   const getTopicsByTab = (tab: string): Topic[] => {
     switch (tab) {
       case 'pending':
-        return filteredTopics.filter((t) =>
-          ['pending_b1', 'pending_b2', 'pending_b3'].includes(t.status)
-        )
+        return filteredTopics.filter((t) => t.status === 'pending')
       case 'approved':
         return filteredTopics.filter((t) => t.status === 'approved')
       case 'rejected':
@@ -127,14 +163,25 @@ export function TopicsPage() {
     }
   }
 
-  const stats = getTopicStats()
+  // Calculate stats from real data
+  const stats = useMemo(
+    () => ({
+      total: filteredTopics.length,
+      pending: filteredTopics.filter((t) => t.status === 'pending').length,
+      approved: filteredTopics.filter((t) => t.status === 'approved').length,
+      rejected: filteredTopics.filter((t) =>
+        ['rejected', 'revision_required'].includes(t.status)
+      ).length,
+    }),
+    [filteredTopics]
+  )
 
   const handleView = (topic: Topic) => {
-    console.log('View topic:', topic.id)
+    navigate({ to: '/topics/$id', params: { id: topic.id } })
   }
 
   const handleEdit = (topic: Topic) => {
-    console.log('Edit topic:', topic.id)
+    navigate({ to: '/topics/$id', params: { id: topic.id } })
   }
 
   const handleDelete = (topic: Topic) => {
@@ -165,31 +212,43 @@ export function TopicsPage() {
       <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
         <StatCard
           title='Tổng đề tài'
-          value={stats.total}
+          value={apiStats?.total.count ?? stats.total}
           subtitle='Tổng số lượng đề tài'
-          trend={{ value: 12.5, isPositive: true }}
-          trendText='Tăng 12.5% tháng này'
+          trend={{
+            value: Math.abs(apiStats?.total.trend ?? 0),
+            isPositive: (apiStats?.total.trend ?? 0) >= 0,
+          }}
+          trendText={`${(apiStats?.total.trend ?? 0) >= 0 ? 'Tăng' : 'Giảm'} ${Math.abs(apiStats?.total.trend ?? 0)}% tháng này`}
         />
         <StatCard
           title='Chờ duyệt'
-          value={stats.pending}
+          value={apiStats?.pending.count ?? stats.pending}
           subtitle='Cần xem xét ngay'
-          trend={{ value: 20, isPositive: false }}
-          trendText='Giảm 20% tuần qua'
+          trend={{
+            value: Math.abs(apiStats?.pending.trend ?? 0),
+            isPositive: (apiStats?.pending.trend ?? 0) <= 0,
+          }}
+          trendText={`${(apiStats?.pending.trend ?? 0) >= 0 ? 'Tăng' : 'Giảm'} ${Math.abs(apiStats?.pending.trend ?? 0)}% tháng này`}
         />
         <StatCard
           title='Đã duyệt'
-          value={stats.approved}
+          value={apiStats?.approved.count ?? stats.approved}
           subtitle='Đã qua kiểm duyệt'
-          trend={{ value: 15.8, isPositive: true }}
-          trendText='Tăng trưởng tích cực'
+          trend={{
+            value: Math.abs(apiStats?.approved.trend ?? 0),
+            isPositive: (apiStats?.approved.trend ?? 0) >= 0,
+          }}
+          trendText={`${(apiStats?.approved.trend ?? 0) >= 0 ? 'Tăng' : 'Giảm'} ${Math.abs(apiStats?.approved.trend ?? 0)}% tháng này`}
         />
         <StatCard
           title='Tỷ lệ thành công'
-          value={`${stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}%`}
-          subtitle='So với mục tiêu'
-          trend={{ value: 4.5, isPositive: true }}
-          trendText='Duy trì mức ổn định'
+          value={`${apiStats?.successRate.rate ?? (stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0)}%`}
+          subtitle={`Cập nhật: ${apiStats?.lastUpdated ? new Date(apiStats.lastUpdated).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '--'}`}
+          trend={{
+            value: Math.abs(apiStats?.successRate.trend ?? 0),
+            isPositive: (apiStats?.successRate.trend ?? 0) >= 0,
+          }}
+          trendText={`${(apiStats?.successRate.trend ?? 0) >= 0 ? 'Tăng' : 'Giảm'} ${Math.abs(apiStats?.successRate.trend ?? 0)}% so với tháng trước`}
         />
       </div>
 
@@ -220,7 +279,12 @@ export function TopicsPage() {
                   <Settings2 className='mr-2 h-4 w-4' />
                   Tùy chỉnh cột
                 </Button>
-                {hasRole(user, ['admin', 'leadership', 'editor', 'reporter']) && (
+                {hasRole(user, [
+                  'admin',
+                  'leadership',
+                  'editor',
+                  'reporter',
+                ]) && (
                   <Button asChild size='sm'>
                     <Link to='/topics/register'>
                       <Plus className='mr-2 h-4 w-4' />

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -13,6 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
+import { vi } from 'date-fns/locale'
 import {
   ArrowUpDown,
   ChevronDown,
@@ -25,6 +25,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -54,7 +55,6 @@ import {
 } from '@/components/ui/table'
 import { type Topic, CONTENT_TYPE_CONFIG } from '../types'
 import { StatusBadge } from './status-badge'
-import { Badge } from '@/components/ui/badge'
 
 interface TopicTableProps {
   data: Topic[]
@@ -113,7 +113,7 @@ export function TopicTable({
       },
       cell: ({ row }) => (
         <div className='max-w-[280px]'>
-          <div className='font-medium truncate'>{row.getValue('title')}</div>
+          <div className='truncate font-medium'>{row.getValue('title')}</div>
           <div className='text-xs text-muted-foreground'>
             {row.original.createdByName}
           </div>
@@ -130,7 +130,7 @@ export function TopicTable({
         return (
           <Badge
             variant='outline'
-            className='whitespace-nowrap text-xs font-normal'
+            className='text-xs font-normal whitespace-nowrap'
           >
             {config?.label || contentType}
           </Badge>
@@ -143,25 +143,14 @@ export function TopicTable({
       cell: ({ row }) => <StatusBadge status={row.getValue('status')} />,
     },
     {
-      accessorKey: 'estimatedDays',
-      header: 'Mục tiêu',
-      cell: ({ row }) => {
-        const days = row.original.estimatedDays
-        return <span className='text-primary font-medium'>{days || '-'}</span>
-      },
-    },
-    {
       accessorKey: 'deadline',
       header: 'Thời hạn',
       cell: ({ row }) => {
         const deadline = row.getValue('deadline') as Date | undefined
         if (!deadline) return <span className='text-muted-foreground'>-</span>
-        const daysLeft = Math.ceil(
-          (deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        )
         return (
-          <span className={daysLeft <= 3 ? 'text-destructive' : ''}>
-            {daysLeft}
+          <span className='text-sm'>
+            {format(deadline, 'dd/MM/yyyy HH:mm', { locale: vi })}
           </span>
         )
       },
@@ -251,7 +240,7 @@ export function TopicTable({
 
   return (
     <div className='w-full'>
-      <div className='flex items-center py-4 gap-4'>
+      <div className='flex items-center gap-4 py-4'>
         <Input
           placeholder='Tìm kiếm đề tài...'
           value={(table.getColumn('title')?.getFilterValue() as string) ?? ''}

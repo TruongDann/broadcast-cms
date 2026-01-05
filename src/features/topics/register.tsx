@@ -4,28 +4,17 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { vi } from 'date-fns/locale'
-import {
-  CalendarIcon,
-  Users,
-  Paperclip,
-  Send,
-  Save,
-  FileText,
-  X,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Paperclip, Send, Save, FileText, X, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { UploadDropzone } from '@/lib/uploadthing'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DateTimePicker } from '@/components/ui/datetime-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import {
   Select,
   SelectContent,
@@ -35,9 +24,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { MultiSelect } from '@/components/ui/multi-select'
-import { CONTENT_TYPE_CONFIG, type ContentType } from './types'
+import { useCreateTopic, useMyTopics } from './hooks/use-topics'
 
 interface UploadedFile {
   name: string
@@ -47,58 +34,23 @@ interface UploadedFile {
 
 interface TopicFormData {
   title: string
-  source: string
-  contentType: ContentType
+  category: string
   outline: string
-  teamMembers: string[]
-  estimatedDays: number
   deadline?: Date
   attachments: UploadedFile[]
 }
 
-// Mock team members data
-const mockTeamMembers = [
-  { id: '1', name: 'Nguyễn Văn A', role: 'Phóng viên' },
-  { id: '2', name: 'Trần Thị B', role: 'Biên tập viên' },
-  { id: '3', name: 'Lê Văn C', role: 'Quay phim' },
-  { id: '4', name: 'Phạm Thị D', role: 'Kỹ thuật viên' },
-  { id: '5', name: 'Hoàng Văn E', role: 'Đạo diễn' },
-]
-
-// Mock my topics data
-const myTopicsData = [
-  {
-    id: '1',
-    title: 'Phóng sự: Thực trạng ô nhiễm kênh rạch tại Ninh Kiều',
-    category: 'Thời sự',
-    status: 'pending',
-    date: '25/10',
-    time: '10:45 AM',
-  },
-  {
-    id: '2',
-    title: 'Phỏng vấn độc quyền: Giám đốc sở Y Tế về vắc xin mới',
-    category: 'Y Tế',
-    status: 'approved',
-    date: '22/10',
-    time: 'Hôm qua',
-  },
-  {
-    id: '3',
-    title: 'Dự thảo quy hoạch giao thông công cộng 2025',
-    category: 'Giao thông',
-    status: 'draft',
-    date: '20/10',
-    time: '20/10',
-  },
-  {
-    id: '4',
-    title: 'Lễ hội trái cây Nam Bộ lần thứ 15 - Tin vắn',
-    category: 'Văn hóa',
-    status: 'rejected',
-    date: '18/10',
-    time: '18/10',
-  },
+// Category options
+const CATEGORY_OPTIONS = [
+  { value: 'thoi_su', label: 'Thời sự' },
+  { value: 'van_hoa', label: 'Văn hóa' },
+  { value: 'kinh_te', label: 'Kinh tế' },
+  { value: 'xa_hoi', label: 'Xã hội' },
+  { value: 'the_thao', label: 'Thể thao' },
+  { value: 'giao_duc', label: 'Giáo dục' },
+  { value: 'y_te', label: 'Y tế' },
+  { value: 'giai_tri', label: 'Giải trí' },
+  { value: 'khac', label: 'Khác' },
 ]
 
 const statusConfig = {
@@ -126,6 +78,12 @@ const statusConfig = {
     dot: 'bg-rose-500',
     bg: 'bg-rose-50 dark:bg-rose-950/30',
   },
+  revision_required: {
+    label: 'Cần sửa',
+    color: 'text-yellow-600',
+    dot: 'bg-yellow-500',
+    bg: 'bg-yellow-50 dark:bg-yellow-950/30',
+  },
 }
 
 export function TopicRegisterPage() {
@@ -133,14 +91,16 @@ export function TopicRegisterPage() {
   const [activeTab, setActiveTab] = useState('all')
   const [formData, setFormData] = useState<TopicFormData>({
     title: '',
-    source: '',
-    contentType: 'broadcast',
+    category: '',
     outline: '',
-    teamMembers: [],
-    estimatedDays: 1,
     deadline: undefined,
     attachments: [],
   })
+
+  // API Hooks
+  const createTopic = useCreateTopic()
+  const { data: myTopicsResponse, isLoading: isLoadingMyTopics } = useMyTopics()
+  const myTopics = myTopicsResponse?.topics || []
 
   const removeAttachment = (url: string) => {
     setFormData((prev) => ({
@@ -156,11 +116,39 @@ export function TopicRegisterPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  const handleSubmit = (e: React.FormEvent, _isDraft: boolean = false) => {
+  const handleSubmit = async (e: React.FormEvent, isDraft: boolean = false) => {
     e.preventDefault()
-    navigate({ to: '/topics' })
-  }
 
+    if (!formData.title.trim()) {
+      toast.error('Vui lòng nhập tiêu đề đề tài')
+      return
+    }
+
+    try {
+      const attachmentsData = formData.attachments.map((file, index) => ({
+        id: `att_${index}_${Date.now()}`,
+        fileName: file.name,
+        fileUrl: file.url,
+        fileType: file.name.split('.').pop() || 'unknown',
+        fileSize: file.size || 0,
+        uploadedAt: new Date().toISOString(),
+      }))
+
+      await createTopic.mutateAsync({
+        title: formData.title,
+        outline: formData.outline,
+        contentType: 'broadcast', // Default value
+        attachments: attachmentsData,
+        deadline: formData.deadline?.toISOString(),
+        isDraft,
+      })
+
+      toast.success(isDraft ? 'Đã lưu bản nháp' : 'Đã gửi đề tài để duyệt')
+      navigate({ to: '/topics' })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Có lỗi xảy ra')
+    }
+  }
   return (
     <div className='flex flex-col gap-4 sm:gap-6'>
       {/* Page Header - giống tasks */}
@@ -172,12 +160,27 @@ export function TopicRegisterPage() {
           </p>
         </div>
         <div className='flex gap-2'>
-          <Button variant='outline' onClick={(e) => handleSubmit(e, true)}>
-            <Save className='mr-2 h-4 w-4' />
+          <Button
+            variant='outline'
+            onClick={(e) => handleSubmit(e, true)}
+            disabled={createTopic.isPending}
+          >
+            {createTopic.isPending ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <Save className='mr-2 h-4 w-4' />
+            )}
             <span>Lưu nháp</span>
           </Button>
-          <Button onClick={(e) => handleSubmit(e, false)}>
-            <Send className='mr-2 h-4 w-4' />
+          <Button
+            onClick={(e) => handleSubmit(e, false)}
+            disabled={createTopic.isPending}
+          >
+            {createTopic.isPending ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <Send className='mr-2 h-4 w-4' />
+            )}
             <span>Gửi duyệt</span>
           </Button>
         </div>
@@ -214,68 +217,45 @@ export function TopicRegisterPage() {
                 />
               </div>
 
-              <Separator />
-
-              {/* Loại nội dung & Deadline */}
+              {/* Chuyên mục & Thời hạn - cùng 1 hàng */}
               <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                {/* Chuyên mục */}
                 <div className='space-y-2'>
                   <Label>
-                    Loại nội dung <span className='text-destructive'>*</span>
+                    Chuyên mục <span className='text-destructive'>*</span>
                   </Label>
                   <Select
-                    value={formData.contentType}
-                    onValueChange={(value: ContentType) =>
-                      setFormData((prev) => ({ ...prev, contentType: value }))
+                    value={formData.category}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, category: value }))
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder='Chọn loại nội dung...' />
+                    <SelectTrigger className='w-full'>
+                      <SelectValue placeholder='Chọn chuyên mục...' />
                     </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(CONTENT_TYPE_CONFIG).map(
-                        ([key, config]) => (
-                          <SelectItem key={key} value={key}>
-                            {config.label}
-                          </SelectItem>
-                        )
-                      )}
+                    <SelectContent className='min-w-[var(--radix-select-trigger-width)]'>
+                      {CATEGORY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* Thời hạn dự kiến */}
                 <div className='space-y-2'>
                   <Label>
                     Thời hạn dự kiến <span className='text-destructive'>*</span>
                   </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant='outline'
-                        className={cn(
-                          'w-full justify-start text-left font-normal',
-                          !formData.deadline && 'text-muted-foreground'
-                        )}
-                      >
-                        <CalendarIcon className='mr-2 h-4 w-4' />
-                        {formData.deadline
-                          ? format(formData.deadline, 'dd/MM/yyyy', {
-                              locale: vi,
-                            })
-                          : 'Chọn ngày'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className='w-auto p-0' align='start'>
-                      <Calendar
-                        mode='single'
-                        selected={formData.deadline}
-                        onSelect={(date) =>
-                          setFormData((prev) => ({ ...prev, deadline: date }))
-                        }
-                        disabled={(date) => date < new Date()}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={formData.deadline}
+                    onChange={(date) =>
+                      setFormData((prev) => ({ ...prev, deadline: date }))
+                    }
+                    placeholder='Chọn ngày giờ'
+                    disablePastDates={true}
+                  />
                 </div>
               </div>
 
@@ -296,31 +276,6 @@ export function TopicRegisterPage() {
                     }))
                   }
                   placeholder='Mô tả ý tưởng, góc nhìn, thông điệp muốn truyền tải...'
-                />
-              </div>
-
-              <Separator />
-
-              {/* Ekip */}
-              <div className='space-y-2'>
-                <Label className='flex items-center gap-2'>
-                  <Users className='h-4 w-4' />
-                  Ekip thực hiện
-                </Label>
-                <MultiSelect
-                  options={mockTeamMembers.map((member) => ({
-                    label: `${member.name} - ${member.role}`,
-                    value: member.id,
-                  }))}
-                  defaultValue={formData.teamMembers}
-                  onValueChange={(values) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      teamMembers: values,
-                    }))
-                  }
-                  placeholder='Chọn thành viên ekip...'
-                  maxCount={3}
                 />
               </div>
             </CardContent>
@@ -363,7 +318,8 @@ export function TopicRegisterPage() {
                 }}
                 content={{
                   label: 'Kéo thả hoặc nhấn để tải lên',
-                  allowedContent: 'PDF, DOC, DOCX, JPG, PNG (Tối đa 8MB mỗi file)',
+                  allowedContent:
+                    'PDF, DOC, DOCX, JPG, PNG (Tối đa 8MB mỗi file)',
                 }}
               />
 
@@ -415,7 +371,7 @@ export function TopicRegisterPage() {
             </CardHeader>
 
             {/* Tabs using shadcn */}
-            <div className='px-6 pb-4'>
+            <div className='px-6'>
               <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
@@ -439,46 +395,54 @@ export function TopicRegisterPage() {
 
             {/* Topics List */}
             <CardContent className='max-h-[400px] space-y-2 overflow-y-auto pt-4'>
-              {myTopicsData.map((topic) => {
-                const status =
-                  statusConfig[topic.status as keyof typeof statusConfig]
-                return (
-                  <div
-                    key={topic.id}
-                    className='group cursor-pointer rounded-lg border p-3 transition-all hover:bg-muted/50'
-                  >
-                    <div className='mb-2 flex items-center justify-between'>
-                      <Badge
-                        variant='outline'
-                        className={cn(
-                          'gap-1 border-0 px-2 py-0.5 text-xs font-semibold',
-                          status.bg,
-                          status.color
-                        )}
-                      >
-                        <span
-                          className={cn('h-1.5 w-1.5 rounded-full', status.dot)}
-                        />
-                        {status.label}
-                      </Badge>
-                      <span className='text-xs text-muted-foreground'>
-                        {topic.time}
-                      </span>
+              {isLoadingMyTopics ? (
+                <div className='flex items-center justify-center py-8'>
+                  <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
+                </div>
+              ) : myTopics.length === 0 ? (
+                <div className='py-8 text-center text-sm text-muted-foreground'>
+                  Bạn chưa có đề tài nào
+                </div>
+              ) : (
+                myTopics.map((topic) => {
+                  const status =
+                    statusConfig[topic.status as keyof typeof statusConfig] ||
+                    statusConfig.draft
+                  const createdDate = new Date(topic.createdAt)
+                  return (
+                    <div
+                      key={topic.id}
+                      className='group cursor-pointer rounded-lg border p-3 transition-all hover:bg-muted/50'
+                    >
+                      <div className='mb-2 flex items-center justify-between'>
+                        <Badge
+                          variant='outline'
+                          className={cn(
+                            'border-0 px-2 py-0.5 text-xs font-semibold',
+                            status.bg,
+                            status.color
+                          )}
+                        >
+                          {status.label}
+                        </Badge>
+                        <span className='text-xs text-muted-foreground'>
+                          {format(createdDate, 'dd/MM', { locale: vi })}
+                        </span>
+                      </div>
+                      <h4 className='mb-2 line-clamp-2 leading-snug font-medium transition-colors group-hover:text-primary'>
+                        {topic.title}
+                      </h4>
+                      <div className='flex items-center gap-2'>
+                        <Badge variant='secondary' className='text-xs'>
+                          {topic.contentType === 'broadcast'
+                            ? 'Phát sóng'
+                            : topic.contentType}
+                        </Badge>
+                      </div>
                     </div>
-                    <h4 className='mb-2 line-clamp-2 leading-snug font-medium transition-colors group-hover:text-primary'>
-                      {topic.title}
-                    </h4>
-                    <div className='flex items-center gap-2'>
-                      <Badge variant='secondary' className='text-xs'>
-                        {topic.category}
-                      </Badge>
-                      <span className='text-xs text-muted-foreground'>
-                        {topic.date}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </CardContent>
           </Card>
         </div>

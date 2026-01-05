@@ -7,15 +7,18 @@ export type ContentType = 'broadcast' | 'print' | 'digital' | 'social' | 'combo'
 // Topic status workflow
 export type TopicStatus =
   | 'draft'
-  | 'pending_b1'
-  | 'pending_b2'
-  | 'pending_b3'
+  | 'pending'
   | 'revision_required'
   | 'approved'
   | 'rejected'
 
 // Approval action types
-export type ApprovalAction = 'approve' | 'reject' | 'comment' | 'submit' | 'request_revision'
+export type ApprovalAction =
+  | 'approve'
+  | 'reject'
+  | 'comment'
+  | 'submit'
+  | 'request_revision'
 
 // Approval level
 export type ApprovalLevel = 'B1' | 'B2' | 'B3'
@@ -101,20 +104,10 @@ export const STATUS_CONFIG: Record<
     color: 'gray',
     description: 'Đề tài đang được soạn thảo',
   },
-  pending_b1: {
-    label: 'Chờ duyệt B1',
+  pending: {
+    label: 'Chờ duyệt',
     color: 'yellow',
-    description: 'Chờ trưởng nhóm duyệt',
-  },
-  pending_b2: {
-    label: 'Chờ duyệt B2',
-    color: 'orange',
-    description: 'Chờ lãnh đạo phòng duyệt',
-  },
-  pending_b3: {
-    label: 'Chờ duyệt B3',
-    color: 'blue',
-    description: 'Chờ lãnh đạo ban biên tập duyệt',
+    description: 'Đang chờ lãnh đạo duyệt',
   },
   revision_required: {
     label: 'Cần chỉnh sửa',

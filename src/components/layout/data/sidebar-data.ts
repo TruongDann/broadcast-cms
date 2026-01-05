@@ -17,6 +17,12 @@ import {
   Monitor,
   UserCog,
   Radio,
+  ClipboardList,
+  Car,
+  CalendarDays,
+  Warehouse,
+  Circle,
+  CirclePile,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -111,6 +117,29 @@ export const sidebarData: SidebarData = {
               roles: ['admin', 'leadership', 'editor'],
             },
           ],
+        },
+      ],
+    },
+    {
+      title: 'Điều hành',
+      items: [
+        {
+          title: 'Công lệnh',
+          url: '/operations/orders',
+          icon: ClipboardList,
+          roles: ['leadership', 'admin'],
+        },
+        {
+          title: 'Phương tiện và thiết bị',
+          url: '/operations/vehicles',
+          icon: CirclePile,
+          roles: ['leadership', 'admin'],
+        },
+        {
+          title: 'Lịch công tác',
+          url: '/operations/schedule',
+          icon: CalendarDays,
+          roles: ['leadership', 'admin'],
         },
       ],
     },

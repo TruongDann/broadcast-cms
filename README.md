@@ -15,7 +15,6 @@ Hệ thống quản lý nội dung phát thanh truyền hình (Broadcast Content
 - **UI Library:** Shadcn UI
 - **State Management:** Zustand
 - **Routing:** TanStack Router
-- **Charts:** Recharts
 
 ## Cài đặt và chạy
 
