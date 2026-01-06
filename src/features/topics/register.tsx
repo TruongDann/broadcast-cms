@@ -1,20 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { format } from 'date-fns'
 import { useNavigate, Link } from '@tanstack/react-router'
+import type { OutputData } from '@editorjs/editorjs'
 import { vi } from 'date-fns/locale'
 import { Paperclip, Send, Save, FileText, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { UploadDropzone } from '@/lib/uploadthing'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { BlockEditor, editorDataToHtml } from '@/components/ui/block-editor'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DateTimePicker } from '@/components/ui/datetime-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import {
   Select,
   SelectContent,
@@ -35,7 +35,7 @@ interface UploadedFile {
 interface TopicFormData {
   title: string
   category: string
-  outline: string
+  outline: OutputData | string
   deadline?: Date
   attachments: UploadedFile[]
 }
@@ -88,6 +88,7 @@ const statusConfig = {
 
 export function TopicRegisterPage() {
   const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [activeTab, setActiveTab] = useState('all')
   const [formData, setFormData] = useState<TopicFormData>({
     title: '',
@@ -109,11 +110,24 @@ export function TopicRegisterPage() {
     }))
   }
 
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return ''
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const newFiles = Array.from(files).map((file) => ({
+      name: file.name,
+      url: URL.createObjectURL(file),
+      size: file.size,
+      file, // Keep the File object for later upload
+    }))
+
+    setFormData((prev) => ({
+      ...prev,
+      attachments: [...prev.attachments, ...newFiles],
+    }))
+
+    // Reset input so same file can be selected again
+    e.target.value = ''
   }
 
   const handleSubmit = async (e: React.FormEvent, isDraft: boolean = false) => {
@@ -134,9 +148,14 @@ export function TopicRegisterPage() {
         uploadedAt: new Date().toISOString(),
       }))
 
+      const outlineValue =
+        typeof formData.outline === 'string'
+          ? formData.outline
+          : editorDataToHtml(formData.outline)
+
       await createTopic.mutateAsync({
         title: formData.title,
-        outline: formData.outline,
+        outline: outlineValue,
         contentType: 'broadcast', // Default value
         attachments: attachmentsData,
         deadline: formData.deadline?.toISOString(),
@@ -267,92 +286,96 @@ export function TopicRegisterPage() {
                   Mô tả chi tiết / Pitch{' '}
                   <span className='text-destructive'>*</span>
                 </Label>
-                <RichTextEditor
-                  content={formData.outline}
-                  onChange={(content) =>
+                <BlockEditor
+                  data={formData.outline}
+                  onChange={(data) =>
                     setFormData((prev) => ({
                       ...prev,
-                      outline: content,
+                      outline: data,
                     }))
                   }
+                  holderId='topic-register-editor'
                   placeholder='Mô tả ý tưởng, góc nhìn, thông điệp muốn truyền tải...'
+                  minHeight={150}
                 />
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Tài liệu đính kèm */}
-          <Card>
-            <CardHeader>
-              <CardTitle className='flex items-center gap-2'>
-                <Paperclip className='h-5 w-5 text-primary' />
-                Tài liệu đính kèm
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <UploadDropzone
-                endpoint='topicAttachment'
-                onClientUploadComplete={(res) => {
-                  const newFiles = res.map((file) => ({
-                    name: file.name,
-                    url: file.ufsUrl,
-                    size: file.size,
-                  }))
-                  setFormData((prev) => ({
-                    ...prev,
-                    attachments: [...prev.attachments, ...newFiles],
-                  }))
-                }}
-                onUploadError={(error: Error) => {
-                  alert(`Lỗi tải lên: ${error.message}`)
-                }}
-                config={{ mode: 'auto' }}
-                appearance={{
-                  container:
-                    'border-2 border-dashed rounded-lg p-8 transition-all hover:border-primary/50 hover:bg-muted/50 cursor-pointer',
-                  uploadIcon: 'text-muted-foreground h-10 w-10',
-                  label: 'text-foreground font-medium',
-                  allowedContent: 'text-muted-foreground text-sm',
-                  button:
-                    'bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium',
-                }}
-                content={{
-                  label: 'Kéo thả hoặc nhấn để tải lên',
-                  allowedContent:
-                    'PDF, DOC, DOCX, JPG, PNG (Tối đa 8MB mỗi file)',
-                }}
-              />
+              <Separator />
 
-              {/* Uploaded files */}
-              {formData.attachments.length > 0 && (
-                <div className='mt-4 space-y-2'>
-                  {formData.attachments.map((file) => (
-                    <div
-                      key={file.url}
-                      className='flex items-center justify-between rounded-lg border p-3'
-                    >
-                      <div className='flex items-center gap-3'>
-                        <div className='flex h-10 w-10 items-center justify-center rounded-lg bg-red-100 text-red-600 dark:bg-red-950/50'>
-                          <FileText className='h-5 w-5' />
+              {/* Tài liệu đính kèm - Modern Design */}
+              <div className='space-y-3'>
+                <Label>Tài liệu đính kèm</Label>
+
+                {/* Drop zone / Upload area */}
+                <div
+                  className='group relative flex cursor-pointer items-center justify-center gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-4 transition-all hover:border-primary/50 hover:bg-primary/5'
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className='flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary transition-transform group-hover:scale-110'>
+                    <Paperclip className='h-5 w-5' />
+                  </div>
+                  <div className='text-center'>
+                    <p className='text-sm font-medium'>
+                      Nhấn để chọn file hoặc kéo thả vào đây
+                    </p>
+                    <p className='text-xs text-muted-foreground'>
+                      PDF, DOC, DOCX, JPG, PNG • Tối đa 8MB mỗi file
+                    </p>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type='file'
+                    multiple
+                    accept='.pdf,.doc,.docx,.jpg,.jpeg,.png'
+                    className='hidden'
+                    onChange={handleFileChange}
+                  />
+                </div>
+
+                {/* Uploaded files list */}
+                {formData.attachments.length > 0 && (
+                  <div className='space-y-2'>
+                    {formData.attachments.map((file) => (
+                      <div
+                        key={file.url}
+                        className='group flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50'
+                      >
+                        <div
+                          className={cn(
+                            'flex h-9 w-9 items-center justify-center rounded-lg',
+                            file.name.match(/\.(pdf)$/i)
+                              ? 'bg-red-100 text-red-600 dark:bg-red-950/50'
+                              : file.name.match(/\.(doc|docx)$/i)
+                                ? 'bg-blue-100 text-blue-600 dark:bg-blue-950/50'
+                                : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50'
+                          )}
+                        >
+                          <FileText className='h-4 w-4' />
                         </div>
-                        <div>
-                          <p className='font-medium'>{file.name}</p>
-                          <p className='text-sm text-muted-foreground'>
-                            {formatFileSize(file.size)} • Hoàn thành
+                        <div className='min-w-0 flex-1'>
+                          <p className='truncate text-sm font-medium'>
+                            {file.name}
+                          </p>
+                          <p className='text-xs text-muted-foreground'>
+                            {file.size
+                              ? `${(file.size / 1024).toFixed(1)} KB`
+                              : 'Đã chọn'}
                           </p>
                         </div>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          className='h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive'
+                          onClick={() => removeAttachment(file.url)}
+                        >
+                          <X className='h-4 w-4' />
+                        </Button>
                       </div>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        onClick={() => removeAttachment(file.url)}
-                      >
-                        <X className='h-4 w-4' />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

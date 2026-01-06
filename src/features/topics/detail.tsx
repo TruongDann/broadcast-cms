@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { format } from 'date-fns'
 import { useParams, useNavigate } from '@tanstack/react-router'
+import type { OutputData } from '@editorjs/editorjs'
 import { vi } from 'date-fns/locale'
 import {
   ArrowLeft,
@@ -16,21 +17,23 @@ import {
   Send,
   User,
   X,
+  Calendar,
+  Layers,
+  Printer,
+  MoreHorizontal,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuthStore, hasRole } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { BlockEditor, editorDataToHtml } from '@/components/ui/block-editor'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   useTopic,
-  useTopics,
   useUpdateTopic,
   useSubmitTopic,
   useApproveTopic,
@@ -45,24 +48,14 @@ export function TopicDetailPage() {
   const { user } = useAuthStore()
 
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState({ title: '', outline: '' })
+  const [editData, setEditData] = useState<{
+    title: string
+    outline: OutputData | string
+  }>({ title: '', outline: '' })
   const [approvalComment, setApprovalComment] = useState('')
-  const [selectedTab, setSelectedTab] = useState<string>('all')
 
   // Fetch topic data
   const { data: topic, isLoading, error } = useTopic(id)
-  const { data: topicsData } = useTopics()
-
-  // Filter topics for sidebar
-  const filteredTopics = useMemo(() => {
-    const topics = topicsData?.topics || []
-    if (selectedTab === 'all') return topics
-    if (selectedTab === 'pending')
-      return topics.filter((t) => t.status === 'pending')
-    if (selectedTab === 'approved')
-      return topics.filter((t) => t.status === 'approved')
-    return topics
-  }, [topicsData, selectedTab])
 
   // Mutations
   const updateTopic = useUpdateTopic()
@@ -73,7 +66,9 @@ export function TopicDetailPage() {
 
   const isOwner = topic?.createdBy === user?.id
   const canEdit =
-    isOwner && ['draft', 'revision_required'].includes(topic?.status || '')
+    (isOwner && ['draft', 'revision_required'].includes(topic?.status || '')) ||
+    (hasRole(user, ['admin', 'leadership']) &&
+      ['draft', 'pending', 'revision_required'].includes(topic?.status || ''))
   const canSubmit =
     isOwner && ['draft', 'revision_required'].includes(topic?.status || '')
   const canApprove =
@@ -94,9 +89,13 @@ export function TopicDetailPage() {
   const handleSaveEdit = async () => {
     if (!topic) return
     try {
+      const outlineValue =
+        typeof editData.outline === 'string'
+          ? editData.outline
+          : editorDataToHtml(editData.outline)
       await updateTopic.mutateAsync({
         id: topic.id,
-        data: { title: editData.title, outline: editData.outline },
+        data: { title: editData.title, outline: outlineValue },
       })
       toast.success('Đã lưu thay đổi')
       setIsEditing(false)
@@ -159,16 +158,18 @@ export function TopicDetailPage() {
 
   if (isLoading) {
     return (
-      <div className='flex h-[50vh] items-center justify-center'>
-        <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+      <div className='flex h-96 items-center justify-center'>
+        <Loader2 className='h-8 w-8 animate-spin text-primary' />
       </div>
     )
   }
 
   if (error || !topic) {
     return (
-      <div className='flex h-[50vh] flex-col items-center justify-center gap-4'>
-        <p className='text-muted-foreground'>Không tìm thấy đề tài</p>
+      <div className='flex h-96 flex-col items-center justify-center gap-4'>
+        <p className='text-lg font-medium text-muted-foreground'>
+          Không tìm thấy đề tài yêu cầu
+        </p>
         <Button variant='outline' onClick={() => navigate({ to: '/topics' })}>
           <ArrowLeft className='mr-2 h-4 w-4' />
           Quay lại danh sách
@@ -181,304 +182,93 @@ export function TopicDetailPage() {
   const contentTypeConfig = CONTENT_TYPE_CONFIG[topic.contentType]
 
   return (
-    <>
-      <div className='grid grid-cols-1 gap-6 pb-24 lg:grid-cols-12'>
-        {/* Left Sidebar - Topic List */}
-        <div className='lg:col-span-4'>
-          <Card className='sticky top-20'>
-            <CardHeader className='pb-3'>
-              <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-                <TabsList className='grid w-full grid-cols-3'>
-                  <TabsTrigger value='all' className='text-xs'>
-                    Tất cả ({topicsData?.topics?.length || 0})
-                  </TabsTrigger>
-                  <TabsTrigger value='pending' className='text-xs'>
-                    Chờ duyệt (
-                    {topicsData?.topics?.filter((t) => t.status === 'pending')
-                      .length || 0}
-                    )
-                  </TabsTrigger>
-                  <TabsTrigger value='approved' className='text-xs'>
-                    Đã duyệt
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </CardHeader>
-            <CardContent className='max-h-[calc(100vh-240px)] space-y-2 overflow-y-auto pt-0'>
-              {filteredTopics.map((t) => {
-                const status =
-                  STATUS_CONFIG[t.status as keyof typeof STATUS_CONFIG] ||
-                  STATUS_CONFIG.draft
-                const isSelected = t.id === id
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() =>
-                      navigate({ to: '/topics/$id', params: { id: t.id } })
-                    }
-                    className={cn(
-                      'cursor-pointer rounded-lg border p-3 transition-all hover:bg-muted/50',
-                      isSelected && 'border-primary bg-primary/5'
-                    )}
-                  >
-                    <div className='mb-2 flex items-center gap-2'>
-                      <Avatar className='h-8 w-8'>
-                        <AvatarFallback className='text-xs'>
-                          {t.createdByName?.charAt(0) || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className='min-w-0 flex-1'>
-                        <p className='truncate text-xs font-medium'>
-                          {t.createdByName}
-                        </p>
-                        <p className='text-xs text-muted-foreground'>
-                          {format(new Date(t.createdAt), 'HH:mm', {
-                            locale: vi,
-                          })}
-                        </p>
-                      </div>
-                      <Badge
-                        variant='outline'
-                        className={cn(
-                          'border-0 px-2 py-0.5 text-xs font-semibold',
-                          status.color
-                        )}
-                      >
-                        {status.label}
-                      </Badge>
-                    </div>
-                    <h4 className='line-clamp-2 text-sm font-semibold text-primary'>
-                      {t.title}
-                    </h4>
-                    <p className='mt-1 line-clamp-2 text-xs text-muted-foreground'>
-                      {t.outline?.replace(/<[^>]*>/g, '') || 'Chưa có mô tả'}
-                    </p>
-                  </div>
-                )
-              })}
-              {filteredTopics.length === 0 && (
-                <p className='py-8 text-center text-sm text-muted-foreground'>
-                  Không có đề tài nào
-                </p>
+    <div className='space-y-6'>
+      {/* Page Header */}
+      <div className='flex flex-wrap items-start justify-between gap-4'>
+        {/* Left: Breadcrumb, Badges, Title, Metadata */}
+        <div className='min-w-0 flex-1 space-y-4'>
+          {/* Breadcrumb and Badges Row */}
+          <div className='flex flex-wrap items-center gap-3'>
+            <Button
+              variant='ghost'
+              size='sm'
+              className='h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground'
+              onClick={() => navigate({ to: '/topics' })}
+            >
+              <ArrowLeft className='h-4 w-4' />
+              Quay lại
+            </Button>
+            <div className='h-1 w-1 rounded-full bg-muted-foreground/30' />
+            <Badge
+              variant='outline'
+              className={cn(
+                'border px-3 py-1 text-xs font-medium',
+                statusConfig.color
               )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Content - Topic Detail */}
-        <div className='relative space-y-6 pb-48 lg:col-span-8'>
-          {/* Status Badge */}
-          <Badge
-            className={cn(
-              'w-fit px-3 py-1 text-sm font-semibold',
-              topic.status === 'pending' && 'bg-amber-600 hover:bg-amber-700',
-              topic.status === 'approved' &&
-                'bg-emerald-600 hover:bg-emerald-700',
-              topic.status === 'draft' && 'bg-slate-600 hover:bg-slate-700',
-              topic.status === 'rejected' && 'bg-rose-600 hover:bg-rose-700',
-              topic.status === 'revision_required' &&
-                'bg-yellow-600 hover:bg-yellow-700'
-            )}
-          >
-            {statusConfig.label}
-          </Badge>
+            >
+              {statusConfig.label}
+            </Badge>
+            <Badge variant='outline' className='px-3 py-1 text-xs font-medium'>
+              {contentTypeConfig?.label}
+            </Badge>
+          </div>
 
           {/* Title */}
-          <div>
-            {isEditing ? (
-              <Input
-                value={editData.title}
-                onChange={(e) =>
-                  setEditData((p) => ({ ...p, title: e.target.value }))
-                }
-                className='text-2xl font-bold'
-              />
-            ) : (
-              <h1 className='text-2xl font-bold text-primary'>{topic.title}</h1>
-            )}
-          </div>
-
-          {/* Info Row */}
-          <div className='grid grid-cols-2 gap-4 md:grid-cols-4'>
-            <div className='space-y-1'>
-              <p className='text-xs text-muted-foreground'>NGƯỜI ĐỀ XUẤT</p>
-              <div className='flex items-center gap-2'>
-                <Avatar className='h-6 w-6'>
-                  <AvatarFallback className='text-xs'>
-                    {topic.createdByName?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <span className='text-sm font-medium'>
-                  {topic.createdByName}
-                </span>
-              </div>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-xs text-muted-foreground'>LOẠI HÌNH</p>
-              <Badge variant='secondary' className='mt-1'>
-                {contentTypeConfig?.label || topic.contentType}
-              </Badge>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-xs text-muted-foreground'>THỜI GIAN GỬI</p>
-              <p className='text-sm font-medium'>
-                {format(new Date(topic.createdAt), 'dd/MM/yyyy HH:mm', {
-                  locale: vi,
-                })}
-              </p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-xs text-muted-foreground'>THỜI HẠN</p>
-              <p className='text-sm font-medium'>
-                {topic.deadline
-                  ? format(new Date(topic.deadline), 'dd/MM/yyyy HH:mm', {
-                      locale: vi,
-                    })
-                  : 'Chưa xác định'}
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Description */}
-          <Card>
-            <CardHeader className='pb-3'>
-              <CardTitle className='text-base'>Mô tả tóm tắt</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isEditing ? (
-                <RichTextEditor
-                  content={editData.outline}
-                  onChange={(content) =>
-                    setEditData((p) => ({ ...p, outline: content }))
-                  }
-                />
-              ) : (
-                <div
-                  className='prose prose-sm dark:prose-invert max-w-none'
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      topic.outline ||
-                      '<p class="text-muted-foreground">Chưa có mô tả</p>',
-                  }}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Attachments */}
-          {topic.attachments && topic.attachments.length > 0 && (
-            <div className='grid grid-cols-2 gap-3'>
-              {topic.attachments.map((att) => (
-                <a
-                  key={att.id}
-                  href={att.fileUrl}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='flex items-center gap-3 rounded-lg border border-dashed p-3 transition-colors hover:bg-muted/50'
-                >
-                  <div className='flex h-10 w-10 items-center justify-center rounded bg-red-100 text-red-600 dark:bg-red-950/50'>
-                    <FileText className='h-5 w-5' />
-                  </div>
-                  <div className='min-w-0 flex-1'>
-                    <p className='truncate text-sm font-medium'>
-                      {att.fileName}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      {(att.fileSize / (1024 * 1024)).toFixed(1)} MB
-                    </p>
-                  </div>
-                </a>
-              ))}
-            </div>
+          {isEditing ? (
+            <Input
+              value={editData.title}
+              onChange={(e) =>
+                setEditData((p) => ({ ...p, title: e.target.value }))
+              }
+              className='h-auto w-full border-0 border-b-2 border-muted bg-transparent px-0 py-2 text-3xl font-bold tracking-tight focus-visible:border-primary focus-visible:ring-0'
+              placeholder='Nhập tiêu đề...'
+            />
+          ) : (
+            <h1 className='text-3xl font-bold tracking-tight'>{topic.title}</h1>
           )}
 
-          {/* Approval Section - Sticky Bottom */}
-          <Card className='sticky bottom-4 z-40 border-primary/20 bg-background/95 shadow-lg backdrop-blur'>
-            <CardContent className='flex flex-wrap items-center gap-3 py-4'>
-              <h3 className='text-sm font-semibold'>Phê duyệt</h3>
+          {/* Metadata Row */}
+          <div className='flex flex-wrap items-center gap-6 text-sm text-muted-foreground'>
+            <div className='flex items-center gap-2'>
+              <User className='h-4 w-4' />
+              <span>{topic.createdByName}</span>
+            </div>
+            <div className='flex items-center gap-2'>
+              <Calendar className='h-4 w-4' />
+              <span>{format(new Date(topic.createdAt), 'dd/MM/yyyy')}</span>
+            </div>
+            {topic.deadline && (
+              <div className='flex items-center gap-2'>
+                <Clock className='h-4 w-4' />
+                <span>
+                  Hạn: {format(new Date(topic.deadline), 'dd/MM/yyyy')}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
 
-              <Input
-                placeholder='Nhập ghi chú...'
-                value={approvalComment}
-                onChange={(e) => setApprovalComment(e.target.value)}
-                className='max-w-xs flex-1'
-              />
-
-              {canApprove && (
-                <>
-                  <Button
-                    onClick={handleApprove}
-                    disabled={approveTopic.isPending}
-                    size='sm'
-                    className='bg-emerald-600 hover:bg-emerald-700'
-                  >
-                    {approveTopic.isPending ? (
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    ) : (
-                      <Check className='mr-2 h-4 w-4' />
-                    )}
-                    Duyệt
-                  </Button>
-                  <Button
-                    variant='outline'
-                    onClick={handleRequestRevision}
-                    disabled={requestRevision.isPending}
-                    size='sm'
-                    className='border-yellow-500 text-yellow-600 hover:bg-yellow-50'
-                  >
-                    {requestRevision.isPending ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
-                    ) : (
-                      <RotateCcw className='h-4 w-4' />
-                    )}
-                  </Button>
-                  <Button
-                    variant='outline'
-                    onClick={handleReject}
-                    disabled={rejectTopic.isPending}
-                    size='sm'
-                    className='border-red-500 text-red-600 hover:bg-red-50'
-                  >
-                    {rejectTopic.isPending ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
-                    ) : (
-                      <X className='h-4 w-4' />
-                    )}
-                  </Button>
-                </>
-              )}
-              {canEdit && !isEditing && (
-                <Button variant='outline' size='sm' onClick={handleStartEdit}>
+        {/* Right: Action Buttons */}
+        <div className='flex shrink-0 items-center gap-2'>
+          {!isEditing && (
+            <>
+              <Button variant='outline' size='icon' title='In'>
+                <Printer className='h-4 w-4' />
+              </Button>
+              <Button variant='outline' size='icon' title='Thêm thao tác'>
+                <MoreHorizontal className='h-4 w-4' />
+              </Button>
+              {canEdit && (
+                <Button variant='outline' onClick={handleStartEdit}>
                   <Edit className='mr-2 h-4 w-4' />
-                  Sửa
+                  Chỉnh sửa
                 </Button>
               )}
-              {isEditing && (
-                <>
-                  <Button variant='ghost' size='sm' onClick={handleCancelEdit}>
-                    Hủy
-                  </Button>
-                  <Button
-                    size='sm'
-                    onClick={handleSaveEdit}
-                    disabled={updateTopic.isPending}
-                  >
-                    {updateTopic.isPending ? (
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    ) : (
-                      <Save className='mr-2 h-4 w-4' />
-                    )}
-                    Lưu
-                  </Button>
-                </>
-              )}
-              {canSubmit && !isEditing && (
+              {canSubmit && (
                 <Button
-                  size='sm'
                   onClick={handleSubmit}
                   disabled={submitTopic.isPending}
+                  className='bg-blue-600 text-white hover:bg-blue-700'
                 >
                   {submitTopic.isPending ? (
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -488,60 +278,232 @@ export function TopicDetailPage() {
                   Gửi duyệt
                 </Button>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Approval History */}
-          {topic.approvalHistory && topic.approvalHistory.length > 0 && (
-            <Card>
-              <CardHeader className='pb-3'>
-                <CardTitle className='flex items-center gap-2 text-base'>
-                  <Clock className='h-4 w-4' />
-                  Lịch sử duyệt
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className='space-y-3'>
-                  {topic.approvalHistory.map((record, idx) => (
-                    <div
-                      key={record.id || idx}
-                      className='relative border-l-2 border-muted pb-3 pl-4 last:pb-0'
-                    >
-                      <div className='absolute top-0 -left-1.5 h-3 w-3 rounded-full bg-primary' />
-                      <div className='flex items-center gap-2'>
-                        <User className='h-3 w-3 text-muted-foreground' />
-                        <span className='text-sm font-medium'>
-                          {record.userName}
-                        </span>
-                        <span className='text-xs text-muted-foreground'>
-                          {format(
-                            new Date(record.createdAt),
-                            'dd/MM/yyyy HH:mm',
-                            { locale: vi }
-                          )}
-                        </span>
-                      </div>
-                      <p className='mt-1 text-sm text-muted-foreground'>
-                        {record.action === 'approve' && 'Đã phê duyệt'}
-                        {record.action === 'reject' && 'Đã từ chối'}
-                        {record.action === 'submit' && 'Đã gửi duyệt'}
-                        {record.action === 'request_revision' &&
-                          'Yêu cầu chỉnh sửa'}
-                      </p>
-                      {record.comment && (
-                        <p className='mt-1 text-sm text-muted-foreground italic'>
-                          "{record.comment}"
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            </>
+          )}
+          {isEditing && (
+            <>
+              <Button variant='outline' onClick={handleCancelEdit}>
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSaveEdit}
+                disabled={updateTopic.isPending}
+                className='bg-blue-600 text-white hover:bg-blue-700'
+              >
+                {updateTopic.isPending ? (
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                ) : (
+                  <Save className='mr-2 h-4 w-4' />
+                )}
+                Lưu thay đổi
+              </Button>
+            </>
           )}
         </div>
       </div>
-    </>
+
+      {/* Main Content Grid */}
+      <div className='grid gap-6 lg:grid-cols-12'>
+        {/* Left Column - Content */}
+        <div className='space-y-6 lg:col-span-8'>
+          {/* Content Section */}
+          <div>
+            <h2 className='mb-4 flex items-center gap-2 text-lg font-semibold'>
+              <FileText className='h-5 w-5 text-primary' />
+              Nội dung chi tiết
+            </h2>
+            <Card>
+              <CardContent className='p-6 md:p-8'>
+                {isEditing ? (
+                  <BlockEditor
+                    data={editData.outline}
+                    onChange={(data) =>
+                      setEditData((p) => ({ ...p, outline: data }))
+                    }
+                    holderId='topic-detail-editor'
+                    placeholder='Nhập mô tả chi tiết cho đề tài...'
+                  />
+                ) : (
+                  <div
+                    className='prose prose-slate dark:prose-invert max-w-none'
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        topic.outline ||
+                        '<p class="text-muted-foreground italic">Chưa có mô tả chi tiết.</p>',
+                    }}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Attachments */}
+          <div>
+            <h2 className='mb-4 flex items-center gap-2 text-lg font-semibold'>
+              <Layers className='h-5 w-5 text-primary' />
+              Tài liệu đính kèm ({topic.attachments?.length || 0})
+            </h2>
+            <div className='space-y-3'>
+              {topic.attachments && topic.attachments.length > 0 ? (
+                topic.attachments.map((att) => (
+                  <a
+                    key={att.id}
+                    href={att.fileUrl}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='group flex items-center gap-4 rounded-xl border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md'
+                  >
+                    <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary'>
+                      <FileText className='h-6 w-6' />
+                    </div>
+                    <div className='min-w-0 flex-1'>
+                      <p className='truncate font-medium'>{att.fileName}</p>
+                      <div className='mt-1 flex items-center gap-2 text-xs text-muted-foreground'>
+                        <span className='uppercase'>
+                          {att.fileType.split('/')[1] || 'FILE'}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {(att.fileSize / (1024 * 1024)).toFixed(1)} MB
+                        </span>
+                      </div>
+                    </div>
+                    <Download className='h-5 w-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100' />
+                  </a>
+                ))
+              ) : (
+                <Card className='border-dashed'>
+                  <CardContent className='flex flex-col items-center justify-center py-8 text-center'>
+                    <p className='text-sm text-muted-foreground'>
+                      Không có tài liệu đính kèm.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Sidebar */}
+        <div className='lg:col-span-4'>
+          <div className='sticky top-8 space-y-6'>
+            {/* Timeline History */}
+            {topic.approvalHistory && topic.approvalHistory.length > 0 && (
+              <div>
+                <h2 className='mb-4 flex items-center gap-2 text-lg font-semibold'>
+                  <Clock className='h-5 w-5 text-primary' />
+                  Lịch sử xử lý
+                </h2>
+                <Card>
+                  <CardContent className='p-6'>
+                    <div className='relative space-y-6'>
+                      {/* Connecting Line */}
+                      <div className='absolute top-3 bottom-3 left-[7px] w-px bg-border' />
+
+                      {topic.approvalHistory.map((record, idx) => (
+                        <div key={idx} className='relative pl-8'>
+                          {/* Dot */}
+                          <div
+                            className={cn(
+                              'absolute top-1 left-0 h-4 w-4 rounded-full border-2 border-background',
+                              idx === 0
+                                ? 'bg-primary'
+                                : 'bg-muted-foreground/30'
+                            )}
+                          />
+
+                          <div className='space-y-2'>
+                            <span className='font-medium'>
+                              {record.action === 'approve' && '✓ Đã phê duyệt'}
+                              {record.action === 'reject' && '✗ Đã từ chối'}
+                              {record.action === 'submit' && '→ Đã gửi duyệt'}
+                              {record.action === 'request_revision' &&
+                                '↻ Yêu cầu chỉnh sửa'}
+                            </span>
+                            <p className='text-xs text-muted-foreground'>
+                              {format(
+                                new Date(record.createdAt),
+                                'HH:mm, dd/MM/yyyy',
+                                { locale: vi }
+                              )}
+                            </p>
+                            <div className='flex items-center gap-2'>
+                              <Avatar className='h-5 w-5'>
+                                <AvatarFallback className='text-[8px]'>
+                                  {record.userName?.charAt(0) || 'U'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className='text-sm text-muted-foreground'>
+                                {record.userName}
+                              </span>
+                            </div>
+                            {record.comment && (
+                              <div className='mt-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground italic'>
+                                "{record.comment}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Approval Action Bar */}
+      {canApprove && (
+        <div className='sticky bottom-6 z-50 mx-auto w-full max-w-4xl'>
+          <div className='rounded-2xl border border-primary/20 bg-background/80 p-4 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:ring-white/10'>
+            <div className='flex flex-col items-center gap-4 sm:flex-row'>
+              <div className='w-full flex-1 sm:w-auto'>
+                <Input
+                  placeholder='Nhập nhận xét (bắt buộc khi từ chối/yêu cầu sửa)...'
+                  value={approvalComment}
+                  onChange={(e) => setApprovalComment(e.target.value)}
+                  className='border-muted-foreground/20 bg-background/50 focus-visible:ring-primary/30'
+                />
+              </div>
+              <div className='flex w-full items-center gap-2 sm:w-auto'>
+                <Button
+                  onClick={handleApprove}
+                  disabled={approveTopic.isPending}
+                  className='flex-1 bg-emerald-600 shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 sm:flex-none'
+                >
+                  {approveTopic.isPending ? (
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  ) : (
+                    <Check className='mr-2 h-4 w-4' />
+                  )}
+                  Duyệt
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={handleRequestRevision}
+                  disabled={requestRevision.isPending}
+                  className='flex-1 border-yellow-500/50 text-yellow-700 hover:border-yellow-600 hover:bg-yellow-50 sm:flex-none dark:text-yellow-400 dark:hover:bg-yellow-950/30'
+                >
+                  <RotateCcw className='mr-2 h-4 w-4' />
+                  Sửa
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={handleReject}
+                  disabled={rejectTopic.isPending}
+                  className='flex-1 border-red-500/50 text-red-700 hover:border-red-600 hover:bg-red-50 sm:flex-none dark:text-red-400 dark:hover:bg-red-950/30'
+                >
+                  <X className='mr-2 h-4 w-4' />
+                  Từ chối
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
