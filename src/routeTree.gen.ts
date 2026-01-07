@@ -39,6 +39,7 @@ import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedOperationsVehiclesRouteImport } from './routes/_authenticated/operations/vehicles'
+import { Route as AuthenticatedOperationsAssignmentsRouteImport } from './routes/_authenticated/operations/assignments'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 
 const ClerkRouteRoute = ClerkRouteRouteImport.update({
@@ -198,6 +199,12 @@ const AuthenticatedOperationsVehiclesRoute =
     path: '/operations/vehicles',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedOperationsAssignmentsRoute =
+  AuthenticatedOperationsAssignmentsRouteImport.update({
+    id: '/operations/assignments',
+    path: '/operations/assignments',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
@@ -220,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/operations/assignments': typeof AuthenticatedOperationsAssignmentsRoute
   '/operations/vehicles': typeof AuthenticatedOperationsVehiclesRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -249,6 +257,7 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/operations/assignments': typeof AuthenticatedOperationsAssignmentsRoute
   '/operations/vehicles': typeof AuthenticatedOperationsVehiclesRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -283,6 +292,7 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/operations/assignments': typeof AuthenticatedOperationsAssignmentsRoute
   '/_authenticated/operations/vehicles': typeof AuthenticatedOperationsVehiclesRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/errors/$error'
+    | '/operations/assignments'
     | '/operations/vehicles'
     | '/settings/account'
     | '/settings/appearance'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/errors/$error'
+    | '/operations/assignments'
     | '/operations/vehicles'
     | '/settings/account'
     | '/settings/appearance'
@@ -377,6 +389,7 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/operations/assignments'
     | '/_authenticated/operations/vehicles'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -620,6 +633,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOperationsVehiclesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/operations/assignments': {
+      id: '/_authenticated/operations/assignments'
+      path: '/operations/assignments'
+      fullPath: '/operations/assignments'
+      preLoaderRoute: typeof AuthenticatedOperationsAssignmentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/errors/$error': {
       id: '/_authenticated/errors/$error'
       path: '/errors/$error'
@@ -657,6 +677,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedOperationsAssignmentsRoute: typeof AuthenticatedOperationsAssignmentsRoute
   AuthenticatedOperationsVehiclesRoute: typeof AuthenticatedOperationsVehiclesRoute
   AuthenticatedTopicsIdRoute: typeof AuthenticatedTopicsIdRoute
   AuthenticatedTopicsRegisterRoute: typeof AuthenticatedTopicsRegisterRoute
@@ -669,6 +690,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedOperationsAssignmentsRoute:
+    AuthenticatedOperationsAssignmentsRoute,
   AuthenticatedOperationsVehiclesRoute: AuthenticatedOperationsVehiclesRoute,
   AuthenticatedTopicsIdRoute: AuthenticatedTopicsIdRoute,
   AuthenticatedTopicsRegisterRoute: AuthenticatedTopicsRegisterRoute,

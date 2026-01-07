@@ -16,7 +16,7 @@ const colorVariants: Record<string, string> = {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  // Fallback for unknown or legacy statuses (e.g., pending_b1, pending_b2, pending_b3)
+  // Fallback for unknown or legacy statuses (e.g.)
   const config = STATUS_CONFIG[status] || {
     label: status,
     color: 'gray',

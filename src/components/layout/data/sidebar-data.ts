@@ -124,6 +124,12 @@ export const sidebarData: SidebarData = {
       title: 'Điều hành',
       items: [
         {
+          title: 'Phân công',
+          url: '/operations/assignments',
+          icon: Users,
+          roles: ['leadership', 'admin'],
+        },
+        {
           title: 'Công lệnh',
           url: '/operations/orders',
           icon: ClipboardList,

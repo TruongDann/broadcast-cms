@@ -8,30 +8,33 @@ import { vi } from 'date-fns/locale'
 import {
   ArrowLeft,
   Check,
-  Clock,
   Edit,
   FileText,
   Loader2,
   RotateCcw,
   Save,
   Send,
-  User,
   X,
-  Calendar,
-  Layers,
-  Printer,
-  MoreHorizontal,
-  Download,
+  Paperclip,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuthStore, hasRole } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { BlockEditor, editorDataToHtml } from '@/components/ui/block-editor'
+import { BlockEditor, EditorJsRenderer } from '@/components/ui/block-editor'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { DateTimePicker } from '@/components/ui/datetime-picker'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   useTopic,
   useUpdateTopic,
@@ -40,7 +43,34 @@ import {
   useRejectTopic,
   useRequestRevision,
 } from './hooks/use-topics'
-import { STATUS_CONFIG, CONTENT_TYPE_CONFIG } from './types'
+import { STATUS_CONFIG } from './types'
+
+// Category options
+const CATEGORY_OPTIONS = [
+  { value: 'thoi_su', label: 'Thời sự' },
+  { value: 'van_hoa', label: 'Văn hóa' },
+  { value: 'kinh_te', label: 'Kinh tế' },
+  { value: 'xa_hoi', label: 'Xã hội' },
+  { value: 'the_thao', label: 'Thể thao' },
+  { value: 'giao_duc', label: 'Giáo dục' },
+  { value: 'y_te', label: 'Y tế' },
+  { value: 'giai_tri', label: 'Giải trí' },
+  { value: 'khac', label: 'Khác' },
+]
+
+// Approver options
+const APPROVER_OPTIONS = [
+  {
+    value: 'bbt',
+    label: 'Ban Biên tập (BBT)',
+    description: 'Gửi đề tài trực tiếp lên Ban Biên tập để duyệt',
+  },
+  {
+    value: 'truong_pho_phong',
+    label: 'Trưởng/Phó phòng',
+    description: 'Gửi đề tài cho Trưởng hoặc Phó phòng xem xét trước',
+  },
+]
 
 export function TopicDetailPage() {
   const { id } = useParams({ from: '/_authenticated/topics/$id' })
@@ -51,7 +81,11 @@ export function TopicDetailPage() {
   const [editData, setEditData] = useState<{
     title: string
     outline: OutputData | string
-  }>({ title: '', outline: '' })
+    category: string
+    startDate?: Date
+    endDate?: Date
+    approver: string
+  }>({ title: '', outline: '', category: '', approver: '' })
   const [approvalComment, setApprovalComment] = useState('')
 
   // Fetch topic data
@@ -76,26 +110,42 @@ export function TopicDetailPage() {
 
   const handleStartEdit = () => {
     if (topic) {
-      setEditData({ title: topic.title, outline: topic.outline || '' })
+      setEditData({
+        title: topic.title,
+        outline: topic.outline || '',
+        category: topic.category || '',
+        startDate: topic.startDate ? new Date(topic.startDate) : undefined,
+        endDate: topic.deadline ? new Date(topic.deadline) : undefined,
+        approver: topic.approver || '',
+      })
       setIsEditing(true)
     }
   }
 
   const handleCancelEdit = () => {
     setIsEditing(false)
-    setEditData({ title: '', outline: '' })
+    setEditData({ title: '', outline: '', category: '', approver: '' })
   }
 
   const handleSaveEdit = async () => {
     if (!topic) return
     try {
+      // Lưu dữ liệu dạng JSON string của Editor.js
       const outlineValue =
         typeof editData.outline === 'string'
           ? editData.outline
-          : editorDataToHtml(editData.outline)
+          : JSON.stringify(editData.outline)
       await updateTopic.mutateAsync({
         id: topic.id,
-        data: { title: editData.title, outline: outlineValue },
+        data: {
+          title: editData.title,
+          outline: outlineValue,
+          category: editData.category || undefined,
+          startDate: editData.startDate?.toISOString(),
+          deadline: editData.endDate?.toISOString(),
+          approver:
+            (editData.approver as 'bbt' | 'truong_pho_phong') || undefined,
+        },
       })
       toast.success('Đã lưu thay đổi')
       setIsEditing(false)
@@ -179,117 +229,59 @@ export function TopicDetailPage() {
   }
 
   const statusConfig = STATUS_CONFIG[topic.status]
-  const contentTypeConfig = CONTENT_TYPE_CONFIG[topic.contentType]
 
   return (
-    <div className='space-y-6'>
+    <div className='flex flex-col gap-4 sm:gap-6'>
       {/* Page Header */}
-      <div className='flex flex-wrap items-start justify-between gap-4'>
-        {/* Left: Breadcrumb, Badges, Title, Metadata */}
-        <div className='min-w-0 flex-1 space-y-4'>
-          {/* Breadcrumb and Badges Row */}
-          <div className='flex flex-wrap items-center gap-3'>
-            <Button
-              variant='ghost'
-              size='sm'
-              className='h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground'
-              onClick={() => navigate({ to: '/topics' })}
-            >
-              <ArrowLeft className='h-4 w-4' />
-              Quay lại
-            </Button>
-            <div className='h-1 w-1 rounded-full bg-muted-foreground/30' />
+      <div className='flex flex-wrap items-end justify-between gap-2'>
+        <div className='flex flex-col items-start gap-2'>
+          <Button
+            variant='ghost'
+            size='sm'
+            className='h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground'
+            onClick={() => navigate({ to: '/topics' })}
+          >
+            <ArrowLeft className='h-4 w-4' />
+            Quay lại
+          </Button>
+          <div className='flex items-center gap-3'>
+            <h2 className='text-3xl font-bold tracking-tight'>
+              Chi Tiết Đề Tài
+            </h2>
             <Badge
               variant='outline'
               className={cn(
-                'border px-3 py-1 text-xs font-medium',
-                statusConfig.color
+                'px-3 py-1 text-xs font-medium',
+                statusConfig?.color
               )}
             >
-              {statusConfig.label}
+              {statusConfig?.label}
             </Badge>
-            <Badge variant='outline' className='px-3 py-1 text-xs font-medium'>
-              {contentTypeConfig?.label}
-            </Badge>
-          </div>
-
-          {/* Title */}
-          {isEditing ? (
-            <Input
-              value={editData.title}
-              onChange={(e) =>
-                setEditData((p) => ({ ...p, title: e.target.value }))
-              }
-              className='h-auto w-full border-0 border-b-2 border-muted bg-transparent px-0 py-2 text-3xl font-bold tracking-tight focus-visible:border-primary focus-visible:ring-0'
-              placeholder='Nhập tiêu đề...'
-            />
-          ) : (
-            <h1 className='text-3xl font-bold tracking-tight'>{topic.title}</h1>
-          )}
-
-          {/* Metadata Row */}
-          <div className='flex flex-wrap items-center gap-6 text-sm text-muted-foreground'>
-            <div className='flex items-center gap-2'>
-              <User className='h-4 w-4' />
-              <span>{topic.createdByName}</span>
-            </div>
-            <div className='flex items-center gap-2'>
-              <Calendar className='h-4 w-4' />
-              <span>{format(new Date(topic.createdAt), 'dd/MM/yyyy')}</span>
-            </div>
-            {topic.deadline && (
-              <div className='flex items-center gap-2'>
-                <Clock className='h-4 w-4' />
-                <span>
-                  Hạn: {format(new Date(topic.deadline), 'dd/MM/yyyy')}
-                </span>
-              </div>
-            )}
           </div>
         </div>
-
-        {/* Right: Action Buttons */}
-        <div className='flex shrink-0 items-center gap-2'>
-          {!isEditing && (
-            <>
-              <Button variant='outline' size='icon' title='In'>
-                <Printer className='h-4 w-4' />
-              </Button>
-              <Button variant='outline' size='icon' title='Thêm thao tác'>
-                <MoreHorizontal className='h-4 w-4' />
-              </Button>
-              {canEdit && (
-                <Button variant='outline' onClick={handleStartEdit}>
-                  <Edit className='mr-2 h-4 w-4' />
-                  Chỉnh sửa
-                </Button>
+        <div className='flex gap-2'>
+          {!isEditing && canEdit && (
+            <Button variant='outline' onClick={handleStartEdit}>
+              <Edit className='mr-2 h-4 w-4' />
+              Chỉnh sửa
+            </Button>
+          )}
+          {!isEditing && canSubmit && (
+            <Button onClick={handleSubmit} disabled={submitTopic.isPending}>
+              {submitTopic.isPending ? (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              ) : (
+                <Send className='mr-2 h-4 w-4' />
               )}
-              {canSubmit && (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={submitTopic.isPending}
-                  className='bg-blue-600 text-white hover:bg-blue-700'
-                >
-                  {submitTopic.isPending ? (
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  ) : (
-                    <Send className='mr-2 h-4 w-4' />
-                  )}
-                  Gửi duyệt
-                </Button>
-              )}
-            </>
+              Gửi duyệt
+            </Button>
           )}
           {isEditing && (
             <>
               <Button variant='outline' onClick={handleCancelEdit}>
                 Hủy
               </Button>
-              <Button
-                onClick={handleSaveEdit}
-                disabled={updateTopic.isPending}
-                className='bg-blue-600 text-white hover:bg-blue-700'
-              >
+              <Button onClick={handleSaveEdit} disabled={updateTopic.isPending}>
                 {updateTopic.isPending ? (
                   <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                 ) : (
@@ -302,155 +294,252 @@ export function TopicDetailPage() {
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className='grid gap-6 lg:grid-cols-12'>
-        {/* Left Column - Content */}
+      {/* Main Content - 2 columns */}
+      <div className='grid grid-cols-1 gap-6 lg:grid-cols-12'>
+        {/* Left Column - Form chính */}
         <div className='space-y-6 lg:col-span-8'>
-          {/* Content Section */}
-          <div>
-            <h2 className='mb-4 flex items-center gap-2 text-lg font-semibold'>
-              <FileText className='h-5 w-5 text-primary' />
-              Nội dung chi tiết
-            </h2>
-            <Card>
-              <CardContent className='p-6 md:p-8'>
+          <Card>
+            <CardContent className='space-y-5 pt-6'>
+              {/* Tiêu đề */}
+              <div className='space-y-2'>
+                <Label htmlFor='title'>Tiêu đề đề tài</Label>
+                {isEditing ? (
+                  <Input
+                    id='title'
+                    value={editData.title}
+                    onChange={(e) =>
+                      setEditData((prev) => ({
+                        ...prev,
+                        title: e.target.value,
+                      }))
+                    }
+                  />
+                ) : (
+                  <p className='text-lg font-medium'>{topic.title}</p>
+                )}
+              </div>
+
+              {/* Mô tả */}
+              <div className='space-y-2'>
+                <Label htmlFor='outline'>Mô tả chi tiết / Pitch</Label>
                 {isEditing ? (
                   <BlockEditor
                     data={editData.outline}
                     onChange={(data) =>
-                      setEditData((p) => ({ ...p, outline: data }))
+                      setEditData((prev) => ({
+                        ...prev,
+                        outline: data,
+                      }))
                     }
                     holderId='topic-detail-editor'
-                    placeholder='Nhập mô tả chi tiết cho đề tài...'
+                    placeholder='Mô tả ý tưởng, góc nhìn, thông điệp muốn truyền tải...'
+                    minHeight={150}
                   />
                 ) : (
-                  <div
-                    className='prose prose-slate dark:prose-invert max-w-none'
-                    dangerouslySetInnerHTML={{
-                      __html:
-                        topic.outline ||
-                        '<p class="text-muted-foreground italic">Chưa có mô tả chi tiết.</p>',
-                    }}
-                  />
+                  <div className='rounded-lg border bg-muted/30 p-4'>
+                    {topic.outline ? (
+                      <EditorJsRenderer data={topic.outline} />
+                    ) : (
+                      <p className='text-sm text-muted-foreground italic'>
+                        Chưa có mô tả chi tiết.
+                      </p>
+                    )}
+                  </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
 
-          {/* Attachments */}
-          <div>
-            <h2 className='mb-4 flex items-center gap-2 text-lg font-semibold'>
-              <Layers className='h-5 w-5 text-primary' />
-              Tài liệu đính kèm ({topic.attachments?.length || 0})
-            </h2>
-            <div className='space-y-3'>
-              {topic.attachments && topic.attachments.length > 0 ? (
-                topic.attachments.map((att) => (
-                  <a
-                    key={att.id}
-                    href={att.fileUrl}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='group flex items-center gap-4 rounded-xl border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md'
-                  >
-                    <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary'>
-                      <FileText className='h-6 w-6' />
-                    </div>
-                    <div className='min-w-0 flex-1'>
-                      <p className='truncate font-medium'>{att.fileName}</p>
-                      <div className='mt-1 flex items-center gap-2 text-xs text-muted-foreground'>
-                        <span className='uppercase'>
-                          {att.fileType.split('/')[1] || 'FILE'}
-                        </span>
-                        <span>•</span>
-                        <span>
-                          {(att.fileSize / (1024 * 1024)).toFixed(1)} MB
-                        </span>
-                      </div>
-                    </div>
-                    <Download className='h-5 w-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100' />
-                  </a>
-                ))
-              ) : (
-                <Card className='border-dashed'>
-                  <CardContent className='flex flex-col items-center justify-center py-8 text-center'>
+              {/* Tài liệu đính kèm */}
+              <div className='space-y-3'>
+                <Label>
+                  Tài liệu đính kèm ({topic.attachments?.length || 0})
+                </Label>
+                {topic.attachments && topic.attachments.length > 0 ? (
+                  <div className='space-y-2'>
+                    {topic.attachments.map((file) => (
+                      <a
+                        key={file.id}
+                        href={file.fileUrl}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='group flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50'
+                      >
+                        <div
+                          className={cn(
+                            'flex h-9 w-9 items-center justify-center rounded-lg',
+                            file.fileName.match(/\.(pdf)$/i)
+                              ? 'bg-red-100 text-red-600 dark:bg-red-950/50'
+                              : file.fileName.match(/\.(doc|docx)$/i)
+                                ? 'bg-blue-100 text-blue-600 dark:bg-blue-950/50'
+                                : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50'
+                          )}
+                        >
+                          <FileText className='h-4 w-4' />
+                        </div>
+                        <div className='min-w-0 flex-1'>
+                          <p className='truncate text-sm font-medium'>
+                            {file.fileName}
+                          </p>
+                          <p className='text-xs text-muted-foreground'>
+                            {(file.fileSize / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className='flex items-center justify-center gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-6'>
+                    <Paperclip className='h-5 w-5 text-muted-foreground' />
                     <p className='text-sm text-muted-foreground'>
-                      Không có tài liệu đính kèm.
+                      Không có tài liệu đính kèm
                     </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Right Column - Sidebar */}
+        {/* Right Column - Sidebar cài đặt */}
         <div className='lg:col-span-4'>
-          <div className='sticky top-8 space-y-6'>
-            {/* Timeline History */}
-            {topic.approvalHistory && topic.approvalHistory.length > 0 && (
-              <div>
-                <h2 className='mb-4 flex items-center gap-2 text-lg font-semibold'>
-                  <Clock className='h-5 w-5 text-primary' />
-                  Lịch sử xử lý
-                </h2>
-                <Card>
-                  <CardContent className='p-6'>
-                    <div className='relative space-y-6'>
-                      {/* Connecting Line */}
-                      <div className='absolute top-3 bottom-3 left-[7px] w-px bg-border' />
-
-                      {topic.approvalHistory.map((record, idx) => (
-                        <div key={idx} className='relative pl-8'>
-                          {/* Dot */}
-                          <div
-                            className={cn(
-                              'absolute top-1 left-0 h-4 w-4 rounded-full border-2 border-background',
-                              idx === 0
-                                ? 'bg-primary'
-                                : 'bg-muted-foreground/30'
-                            )}
-                          />
-
-                          <div className='space-y-2'>
-                            <span className='font-medium'>
-                              {record.action === 'approve' && '✓ Đã phê duyệt'}
-                              {record.action === 'reject' && '✗ Đã từ chối'}
-                              {record.action === 'submit' && '→ Đã gửi duyệt'}
-                              {record.action === 'request_revision' &&
-                                '↻ Yêu cầu chỉnh sửa'}
-                            </span>
-                            <p className='text-xs text-muted-foreground'>
-                              {format(
-                                new Date(record.createdAt),
-                                'HH:mm, dd/MM/yyyy',
-                                { locale: vi }
-                              )}
-                            </p>
-                            <div className='flex items-center gap-2'>
-                              <Avatar className='h-5 w-5'>
-                                <AvatarFallback className='text-[8px]'>
-                                  {record.userName?.charAt(0) || 'U'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className='text-sm text-muted-foreground'>
-                                {record.userName}
-                              </span>
-                            </div>
-                            {record.comment && (
-                              <div className='mt-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground italic'>
-                                "{record.comment}"
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+          <Card className='sticky top-4'>
+            <CardContent className='space-y-4 pt-6'>
+              {/* Ngày bắt đầu */}
+              <div className='space-y-2'>
+                <Label>Ngày bắt đầu</Label>
+                {isEditing ? (
+                  <DateTimePicker
+                    value={editData.startDate}
+                    onChange={(date) =>
+                      setEditData((prev) => ({ ...prev, startDate: date }))
+                    }
+                    placeholder='Chọn ngày'
+                  />
+                ) : (
+                  <p className='text-sm'>
+                    {topic.startDate
+                      ? format(new Date(topic.startDate), 'dd/MM/yyyy', {
+                          locale: vi,
+                        })
+                      : '—'}
+                  </p>
+                )}
               </div>
-            )}
-          </div>
+
+              {/* Ngày hoàn thành */}
+              <div className='space-y-2'>
+                <Label>Ngày hoàn thành</Label>
+                {isEditing ? (
+                  <DateTimePicker
+                    value={editData.endDate}
+                    onChange={(date) =>
+                      setEditData((prev) => ({ ...prev, endDate: date }))
+                    }
+                    placeholder='Chọn ngày'
+                    disablePastDates={true}
+                  />
+                ) : (
+                  <p className='text-sm'>
+                    {topic.deadline
+                      ? format(new Date(topic.deadline), 'dd/MM/yyyy', {
+                          locale: vi,
+                        })
+                      : '—'}
+                  </p>
+                )}
+              </div>
+
+              {/* Danh mục */}
+              <div className='space-y-2'>
+                <Label>Danh mục</Label>
+                {isEditing ? (
+                  <Select
+                    value={editData.category}
+                    onValueChange={(value) =>
+                      setEditData((prev) => ({ ...prev, category: value }))
+                    }
+                  >
+                    <SelectTrigger className='w-full'>
+                      <SelectValue placeholder='Chọn danh mục...' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className='text-sm'>
+                    {CATEGORY_OPTIONS.find((c) => c.value === topic.category)
+                      ?.label || '—'}
+                  </p>
+                )}
+              </div>
+
+              {/* Đăng ký với */}
+              <div className='space-y-3'>
+                <Label>Đăng ký với</Label>
+                {isEditing ? (
+                  <RadioGroup
+                    value={editData.approver}
+                    onValueChange={(value) =>
+                      setEditData((prev) => ({ ...prev, approver: value }))
+                    }
+                    className='space-y-2'
+                  >
+                    {APPROVER_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        htmlFor={`detail-${option.value}`}
+                        className={cn(
+                          'flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-all hover:bg-muted/50',
+                          editData.approver === option.value &&
+                            'border-primary bg-primary/5'
+                        )}
+                      >
+                        <RadioGroupItem
+                          value={option.value}
+                          id={`detail-${option.value}`}
+                          className='mt-0.5'
+                        />
+                        <div className='flex-1 space-y-0.5'>
+                          <p className='mb-2 text-sm leading-none font-medium'>
+                            {option.label}
+                          </p>
+                          <p className='text-xs text-muted-foreground'>
+                            {option.description}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </RadioGroup>
+                ) : (
+                  <p className='text-sm'>
+                    {APPROVER_OPTIONS.find((a) => a.value === topic.approver)
+                      ?.label || '—'}
+                  </p>
+                )}
+              </div>
+
+              {/* Thông tin tạo */}
+              <div className='space-y-2 border-t pt-4'>
+                <Label className='text-muted-foreground'>Thông tin</Label>
+                <div className='space-y-1 text-sm'>
+                  <p>
+                    <span className='text-muted-foreground'>Người tạo:</span>{' '}
+                    {topic.createdByName}
+                  </p>
+                  <p>
+                    <span className='text-muted-foreground'>Ngày tạo:</span>{' '}
+                    {format(new Date(topic.createdAt), 'dd/MM/yyyy HH:mm', {
+                      locale: vi,
+                    })}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

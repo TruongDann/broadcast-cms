@@ -24,6 +24,7 @@ export interface CreateTopicRequest {
   title: string
   outline?: string
   contentType: 'broadcast' | 'print' | 'digital' | 'social' | 'combo'
+  category?: string
   teamMembers?: Array<{
     userId: string
     userName: string
@@ -39,7 +40,9 @@ export interface CreateTopicRequest {
     uploadedAt: string
   }>
   estimatedDays?: number
+  startDate?: string
   deadline?: string
+  approver?: 'bbt' | 'truong_pho_phong'
   isDraft?: boolean
 }
 
@@ -47,6 +50,7 @@ export interface UpdateTopicRequest {
   title?: string
   outline?: string
   contentType?: 'broadcast' | 'print' | 'digital' | 'social' | 'combo'
+  category?: string
   teamMembers?: Array<{
     userId: string
     userName: string
@@ -62,7 +66,9 @@ export interface UpdateTopicRequest {
     uploadedAt: string
   }>
   estimatedDays?: number
+  startDate?: string
   deadline?: string
+  approver?: 'bbt' | 'truong_pho_phong'
 }
 
 interface ApiResponse<T> {
@@ -77,6 +83,7 @@ export interface TopicResponse {
   title: string
   outline: string | null
   contentType: 'broadcast' | 'print' | 'digital' | 'social' | 'combo'
+  category: string | null
   teamMembers: Array<{
     userId: string
     userName: string
@@ -92,12 +99,19 @@ export interface TopicResponse {
     uploadedAt: string
   }>
   estimatedDays: number
+  startDate: string | null
   deadline: string | null
+  approver: 'bbt' | 'truong_pho_phong' | null
   createdBy: string
   createdByName: string | null
   departmentId: string | null
   departmentName: string | null
-  status: 'draft' | 'pending' | 'revision_required' | 'approved' | 'rejected'
+  status:
+    | 'draft'
+    | 'pending'
+    | 'revision_required'
+    | 'approved'
+    | 'rejected'
   createdAt: string
   updatedAt: string
   approvalHistory?: Array<{

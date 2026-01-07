@@ -15,10 +15,13 @@ export interface DbTopic {
   title: string
   outline: string | null
   content_type: 'broadcast' | 'print' | 'digital' | 'social' | 'combo'
+  category: string | null
   team_members: TeamMemberJson[]
   attachments: AttachmentJson[]
   estimated_days: number
+  start_date: string | null
   deadline: string | null
+  approver: 'bbt' | 'truong_pho_phong' | null
   created_by: string
   created_by_name: string | null
   department_id: string | null

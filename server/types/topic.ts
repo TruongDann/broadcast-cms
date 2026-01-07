@@ -4,10 +4,13 @@ export interface CreateTopicDTO {
   title: string
   outline?: string
   contentType: 'broadcast' | 'print' | 'digital' | 'social' | 'combo'
+  category?: string
   teamMembers?: TeamMemberInput[]
   attachments?: AttachmentInput[]
   estimatedDays?: number
+  startDate?: string
   deadline?: string
+  approver?: 'bbt' | 'truong_pho_phong'
   isDraft?: boolean
 }
 
@@ -15,10 +18,13 @@ export interface UpdateTopicDTO {
   title?: string
   outline?: string
   contentType?: 'broadcast' | 'print' | 'digital' | 'social' | 'combo'
+  category?: string
   teamMembers?: TeamMemberInput[]
   attachments?: AttachmentInput[]
   estimatedDays?: number
+  startDate?: string
   deadline?: string
+  approver?: 'bbt' | 'truong_pho_phong'
 }
 
 export interface ApprovalDTO {
@@ -59,10 +65,13 @@ export interface TopicResponse {
   title: string
   outline: string | null
   contentType: 'broadcast' | 'print' | 'digital' | 'social' | 'combo'
+  category: string | null
   teamMembers: TeamMemberInput[]
   attachments: AttachmentInput[]
   estimatedDays: number
+  startDate: string | null
   deadline: string | null
+  approver: 'bbt' | 'truong_pho_phong' | null
   createdBy: string
   createdByName: string | null
   departmentId: string | null

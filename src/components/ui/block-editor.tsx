@@ -624,4 +624,309 @@ export function htmlToEditorData(html: string): OutputData {
   }
 }
 
+/**
+ * Parse Editor.js data from string or object
+ */
+function parseEditorData(
+  data: string | OutputData | null | undefined
+): OutputData | null {
+  if (!data) return null
+
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data)
+      if (parsed.blocks && Array.isArray(parsed.blocks)) {
+        return parsed as OutputData
+      }
+    } catch {
+      // If not valid JSON, treat as HTML/plain text - wrap in paragraph
+      if (data.trim()) {
+        return {
+          time: Date.now(),
+          blocks: [{ id: '1', type: 'paragraph', data: { text: data } }],
+          version: '2.28.0',
+        }
+      }
+    }
+    return null
+  }
+
+  if (typeof data === 'object' && data.blocks) {
+    return data
+  }
+
+  return null
+}
+
+interface EditorJsRendererProps {
+  data: string | OutputData | null | undefined
+  className?: string
+}
+
+/**
+ * Render Editor.js OutputData as formatted content
+ */
+export function EditorJsRenderer({ data, className }: EditorJsRendererProps) {
+  const parsedData = parseEditorData(data)
+
+  if (!parsedData?.blocks?.length) {
+    return null
+  }
+
+  const renderListItems = (
+    items: any[],
+    style: 'ordered' | 'unordered'
+  ): React.ReactNode => {
+    const Tag = style === 'ordered' ? 'ol' : 'ul'
+    return (
+      <Tag
+        className={cn(
+          style === 'ordered' ? 'list-decimal' : 'list-disc',
+          'ml-4 space-y-1'
+        )}
+      >
+        {items.map((item, idx) => {
+          const content =
+            typeof item === 'string' ? item : item.content || item.text || ''
+          const nestedItems = item.items
+          return (
+            <li key={idx} className='text-sm'>
+              <span dangerouslySetInnerHTML={{ __html: content }} />
+              {nestedItems?.length > 0 && renderListItems(nestedItems, style)}
+            </li>
+          )
+        })}
+      </Tag>
+    )
+  }
+
+  return (
+    <div className={cn('space-y-3', className)}>
+      {parsedData.blocks.map((block) => {
+        switch (block.type) {
+          case 'header': {
+            const level = block.data.level || 2
+            const headingClasses = cn(
+              'font-bold',
+              level === 1 && 'text-2xl',
+              level === 2 && 'text-xl',
+              level === 3 && 'text-lg',
+              level >= 4 && 'text-base'
+            )
+            // Render heading based on level
+            if (level === 1) {
+              return (
+                <h1
+                  key={block.id}
+                  className={headingClasses}
+                  dangerouslySetInnerHTML={{ __html: block.data.text }}
+                />
+              )
+            }
+            if (level === 2) {
+              return (
+                <h2
+                  key={block.id}
+                  className={headingClasses}
+                  dangerouslySetInnerHTML={{ __html: block.data.text }}
+                />
+              )
+            }
+            if (level === 3) {
+              return (
+                <h3
+                  key={block.id}
+                  className={headingClasses}
+                  dangerouslySetInnerHTML={{ __html: block.data.text }}
+                />
+              )
+            }
+            if (level === 4) {
+              return (
+                <h4
+                  key={block.id}
+                  className={headingClasses}
+                  dangerouslySetInnerHTML={{ __html: block.data.text }}
+                />
+              )
+            }
+            return (
+              <h5
+                key={block.id}
+                className={headingClasses}
+                dangerouslySetInnerHTML={{ __html: block.data.text }}
+              />
+            )
+          }
+
+          case 'paragraph':
+            return (
+              <p
+                key={block.id}
+                className='text-sm leading-relaxed'
+                dangerouslySetInnerHTML={{ __html: block.data.text }}
+              />
+            )
+
+          case 'list':
+            return (
+              <div key={block.id}>
+                {renderListItems(
+                  block.data.items || [],
+                  block.data.style || 'unordered'
+                )}
+              </div>
+            )
+
+          case 'checklist':
+            return (
+              <ul key={block.id} className='space-y-1.5'>
+                {(block.data.items || []).map((item: any, idx: number) => (
+                  <li key={idx} className='flex items-start gap-2 text-sm'>
+                    <input
+                      type='checkbox'
+                      checked={item.checked}
+                      disabled
+                      className='mt-0.5 h-4 w-4 rounded border-primary'
+                    />
+                    <span
+                      className={cn(
+                        item.checked && 'text-muted-foreground line-through'
+                      )}
+                      dangerouslySetInnerHTML={{ __html: item.text }}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )
+
+          case 'quote':
+            return (
+              <blockquote
+                key={block.id}
+                className='border-l-4 border-l-primary bg-muted/30 py-2 pl-4 italic'
+              >
+                <p
+                  className='text-sm'
+                  dangerouslySetInnerHTML={{ __html: block.data.text }}
+                />
+                {block.data.caption && (
+                  <cite className='mt-1 block text-xs text-muted-foreground not-italic'>
+                    — {block.data.caption}
+                  </cite>
+                )}
+              </blockquote>
+            )
+
+          case 'warning':
+            return (
+              <div
+                key={block.id}
+                className='rounded-lg border border-yellow-500/50 bg-yellow-50 p-3 dark:bg-yellow-950/20'
+              >
+                {block.data.title && (
+                  <p className='mb-1 text-sm font-semibold text-yellow-700 dark:text-yellow-400'>
+                    ⚠️ {block.data.title}
+                  </p>
+                )}
+                <p
+                  className='text-sm text-yellow-700 dark:text-yellow-300'
+                  dangerouslySetInnerHTML={{ __html: block.data.message }}
+                />
+              </div>
+            )
+
+          case 'code':
+            return (
+              <pre
+                key={block.id}
+                className='overflow-x-auto rounded-lg border bg-muted p-3 font-mono text-sm'
+              >
+                <code>{block.data.code}</code>
+              </pre>
+            )
+
+          case 'delimiter':
+            return <hr key={block.id} className='my-4 border-border' />
+
+          case 'table':
+            return (
+              <div key={block.id} className='overflow-x-auto'>
+                <table className='w-full border-collapse text-sm'>
+                  <tbody>
+                    {(block.data.content || []).map(
+                      (row: string[], rowIdx: number) => (
+                        <tr key={rowIdx}>
+                          {row.map((cell, cellIdx) => {
+                            const CellTag =
+                              block.data.withHeadings && rowIdx === 0
+                                ? 'th'
+                                : 'td'
+                            return (
+                              <CellTag
+                                key={cellIdx}
+                                className={cn(
+                                  'border border-border p-2',
+                                  block.data.withHeadings &&
+                                    rowIdx === 0 &&
+                                    'bg-muted font-medium'
+                                )}
+                                dangerouslySetInnerHTML={{ __html: cell }}
+                              />
+                            )
+                          })}
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )
+
+          case 'image':
+            return (
+              <figure key={block.id} className='space-y-2'>
+                <img
+                  src={block.data.file?.url}
+                  alt={block.data.caption || ''}
+                  className='max-w-full rounded-lg border'
+                />
+                {block.data.caption && (
+                  <figcaption className='text-center text-xs text-muted-foreground'>
+                    {block.data.caption}
+                  </figcaption>
+                )}
+              </figure>
+            )
+
+          case 'embed':
+            return (
+              <div key={block.id} className='overflow-hidden rounded-lg border'>
+                <iframe
+                  src={block.data.embed}
+                  width='100%'
+                  height='320'
+                  frameBorder='0'
+                  allowFullScreen
+                  className='w-full'
+                />
+              </div>
+            )
+
+          case 'raw':
+            return (
+              <div
+                key={block.id}
+                dangerouslySetInnerHTML={{ __html: block.data.html || '' }}
+              />
+            )
+
+          default:
+            return null
+        }
+      })}
+    </div>
+  )
+}
+
 export default BlockEditor

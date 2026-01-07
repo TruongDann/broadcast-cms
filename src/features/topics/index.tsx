@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { Plus, TrendingUp, TrendingDown, Settings2 } from 'lucide-react'
 import { useAuthStore, hasRole } from '@/stores/auth-store'
 import { Badge } from '@/components/ui/badge'
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { TopicResponse } from './api/topics-api'
+import { TopicDetailModal } from './components/topic-detail-modal'
 import { TopicTable } from './components/topic-table'
 import { TopicsChart } from './components/topics-chart'
 import { useTopics, useTopicStats } from './hooks/use-topics'
@@ -115,7 +116,8 @@ function StatCard({ title, value, subtitle, trend, trendText }: StatCardProps) {
 export function TopicsPage() {
   const { user } = useAuthStore()
   const [selectedTab, setSelectedTab] = useState<string>('all')
-  const navigate = useNavigate()
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
   // Fetch topics from API
   const { data: topicsData } = useTopics()
@@ -177,15 +179,17 @@ export function TopicsPage() {
   )
 
   const handleView = (topic: Topic) => {
-    navigate({ to: '/topics/$id', params: { id: topic.id } })
+    setSelectedTopicId(topic.id)
+    setIsDetailModalOpen(true)
   }
 
   const handleEdit = (topic: Topic) => {
-    navigate({ to: '/topics/$id', params: { id: topic.id } })
+    setSelectedTopicId(topic.id)
+    setIsDetailModalOpen(true)
   }
 
-  const handleDelete = (topic: Topic) => {
-    console.log('Delete topic:', topic.id)
+  const handleDelete = (_topic: Topic) => {
+    // TODO: Implement delete
   }
 
   return (
@@ -331,6 +335,13 @@ export function TopicsPage() {
           </CardContent>
         </Tabs>
       </Card>
+
+      {/* Topic Detail Modal */}
+      <TopicDetailModal
+        topicId={selectedTopicId}
+        open={isDetailModalOpen}
+        onOpenChange={setIsDetailModalOpen}
+      />
     </div>
   )
 }
