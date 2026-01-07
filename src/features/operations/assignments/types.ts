@@ -3,11 +3,11 @@ import { type Role } from '@/stores/auth-store'
 
 // Assignment status workflow
 export type AssignmentStatus =
-  | 'pending'       // Chờ phân công
-  | 'assigned'      // Đã phân công
-  | 'in_progress'   // Đang thực hiện
-  | 'completed'     // Hoàn thành
-  | 'overdue'       // Quá hạn
+  | 'pending' // Chờ phân công
+  | 'assigned' // Đã phân công
+  | 'in_progress' // Đang thực hiện
+  | 'completed' // Hoàn thành
+  | 'overdue' // Quá hạn
 
 // Assignment priority
 export type AssignmentPriority = 'low' | 'medium' | 'high' | 'urgent'

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -13,6 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
+import { vi } from 'date-fns/locale'
 import {
   ArrowUpDown,
   ChevronDown,
@@ -124,7 +124,9 @@ export function AssignmentTable({
       },
       cell: ({ row }) => (
         <div className='flex flex-col'>
-          <span className='font-medium text-primary'>{row.getValue('code')}</span>
+          <span className='font-medium text-primary'>
+            {row.getValue('code')}
+          </span>
           <span className='text-xs text-muted-foreground'>
             {format(row.original.createdAt, 'dd/MM/yyyy', { locale: vi })}
           </span>
@@ -138,11 +140,14 @@ export function AssignmentTable({
         <div className='flex items-center gap-2'>
           <Avatar className='h-8 w-8'>
             <AvatarImage src='' />
-            <AvatarFallback className='text-xs bg-primary/10'>
-              {row.original.clientAvatar || row.original.clientName.substring(0, 2).toUpperCase()}
+            <AvatarFallback className='bg-primary/10 text-xs'>
+              {row.original.clientAvatar ||
+                row.original.clientName.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className='text-sm font-medium'>{row.getValue('clientName')}</span>
+          <span className='text-sm font-medium'>
+            {row.getValue('clientName')}
+          </span>
         </div>
       ),
     },
@@ -151,9 +156,9 @@ export function AssignmentTable({
       header: 'Dịch vụ & Nội dung',
       cell: ({ row }) => {
         return (
-          <div className='flex flex-col gap-1 max-w-64'>
+          <div className='flex max-w-64 flex-col gap-1'>
             <ServiceTypeBadge serviceType={row.getValue('serviceType')} />
-            <span className='text-sm truncate'>{row.original.topicTitle}</span>
+            <span className='truncate text-sm'>{row.original.topicTitle}</span>
           </div>
         )
       },
@@ -186,7 +191,12 @@ export function AssignmentTable({
         return (
           <div className='flex flex-col text-sm'>
             {deliverables.map((item, index) => (
-              <span key={index} className={index === 0 ? 'font-medium' : 'text-muted-foreground'}>
+              <span
+                key={index}
+                className={
+                  index === 0 ? 'font-medium' : 'text-muted-foreground'
+                }
+              >
                 {item}
               </span>
             ))}
@@ -204,16 +214,22 @@ export function AssignmentTable({
           <div className='flex flex-col gap-1'>
             <span className='font-bold'>
               {new Intl.NumberFormat('vi-VN').format(value)}
-              <span className='text-xs text-muted-foreground ml-0.5'>đ</span>
+              <span className='ml-0.5 text-xs text-muted-foreground'>đ</span>
             </span>
             <div className='flex items-center gap-2'>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className='flex items-center gap-1'>
-                      <div className={`h-2 w-2 rounded-full ${progress === 100 ? 'bg-green-500' : progress > 0 ? 'bg-cyan-500' : 'bg-muted-foreground'}`} />
+                      <div
+                        className={`h-2 w-2 rounded-full ${progress === 100 ? 'bg-green-500' : progress > 0 ? 'bg-cyan-500' : 'bg-muted-foreground'}`}
+                      />
                       <span className='text-xs text-muted-foreground'>
-                        {progress === 100 ? 'Đã TT 100%' : progress > 0 ? `Chờ TT ${100 - progress}%` : 'Chưa TT'}
+                        {progress === 100
+                          ? 'Đã TT 100%'
+                          : progress > 0
+                            ? `Chờ TT ${100 - progress}%`
+                            : 'Chưa TT'}
                       </span>
                     </div>
                   </TooltipTrigger>
@@ -230,7 +246,9 @@ export function AssignmentTable({
     {
       accessorKey: 'status',
       header: 'Trạng thái',
-      cell: ({ row }) => <AssignmentStatusBadge status={row.getValue('status')} />,
+      cell: ({ row }) => (
+        <AssignmentStatusBadge status={row.getValue('status')} />
+      ),
     },
     {
       id: 'actions',
@@ -316,9 +334,13 @@ export function AssignmentTable({
           className='max-w-xs'
         />
         <Select
-          value={(table.getColumn('serviceType')?.getFilterValue() as string) ?? ''}
+          value={
+            (table.getColumn('serviceType')?.getFilterValue() as string) ?? ''
+          }
           onValueChange={(value) =>
-            table.getColumn('serviceType')?.setFilterValue(value === 'all' ? '' : value)
+            table
+              .getColumn('serviceType')
+              ?.setFilterValue(value === 'all' ? '' : value)
           }
         >
           <SelectTrigger className='w-45'>
@@ -336,7 +358,9 @@ export function AssignmentTable({
         <Select
           value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
           onValueChange={(value) =>
-            table.getColumn('status')?.setFilterValue(value === 'all' ? '' : value)
+            table
+              .getColumn('status')
+              ?.setFilterValue(value === 'all' ? '' : value)
           }
         >
           <SelectTrigger className='w-40'>
@@ -410,7 +434,10 @@ export function AssignmentTable({
                   onClick={() => onView?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} onClick={(e) => e.stopPropagation()}>
+                    <TableCell
+                      key={cell.id}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()

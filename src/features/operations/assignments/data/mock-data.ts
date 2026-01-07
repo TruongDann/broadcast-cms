@@ -187,20 +187,28 @@ export const mockAssignments: Assignment[] = [
 export function getAssignmentStats() {
   const total = mockAssignments.length
   const pending = mockAssignments.filter((a) => a.status === 'pending').length
-  const inProgress = mockAssignments.filter((a) => a.status === 'in_progress').length
-  const completed = mockAssignments.filter((a) => a.status === 'completed').length
+  const inProgress = mockAssignments.filter(
+    (a) => a.status === 'in_progress'
+  ).length
+  const completed = mockAssignments.filter(
+    (a) => a.status === 'completed'
+  ).length
   const overdue = mockAssignments.filter((a) => a.status === 'overdue').length
-  
+
   // Get deadlines this week
   const now = new Date()
   const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const deadlinesThisWeek = mockAssignments.filter(
-    (a) => a.deadline >= now && a.deadline <= weekFromNow && a.status !== 'completed'
+    (a) =>
+      a.deadline >= now && a.deadline <= weekFromNow && a.status !== 'completed'
   ).length
-  
+
   // Calculate total value
-  const totalValue = mockAssignments.reduce((sum, a) => sum + a.estimatedValue, 0)
-  
+  const totalValue = mockAssignments.reduce(
+    (sum, a) => sum + a.estimatedValue,
+    0
+  )
+
   return {
     total,
     pending,
@@ -214,12 +222,52 @@ export function getAssignmentStats() {
 
 // Mock available employees for assignment
 export const mockEmployees = [
-  { id: '1', name: 'Nguyễn Thu Hà', role: 'reporter', department: 'Phòng Sản xuất' },
-  { id: '2', name: 'Lê Văn Thành', role: 'reporter', department: 'Phòng Sản xuất' },
-  { id: '3', name: 'Phạm Thu Trang', role: 'reporter', department: 'Phòng Tin tức' },
-  { id: '4', name: 'Trần Minh Tuấn', role: 'reporter', department: 'Phòng Sản xuất' },
-  { id: '5', name: 'Hoàng Văn Nam', role: 'technician', department: 'Phòng Kỹ thuật' },
-  { id: '6', name: 'Lê Thị Mai', role: 'reporter', department: 'Phòng Tin tức' },
-  { id: '7', name: 'Nguyễn Đức Anh', role: 'editor', department: 'Phòng Sản xuất' },
-  { id: '8', name: 'Trần Thị Bích', role: 'technician', department: 'Phòng Kỹ thuật' },
+  {
+    id: '1',
+    name: 'Nguyễn Thu Hà',
+    role: 'reporter',
+    department: 'Phòng Sản xuất',
+  },
+  {
+    id: '2',
+    name: 'Lê Văn Thành',
+    role: 'reporter',
+    department: 'Phòng Sản xuất',
+  },
+  {
+    id: '3',
+    name: 'Phạm Thu Trang',
+    role: 'reporter',
+    department: 'Phòng Tin tức',
+  },
+  {
+    id: '4',
+    name: 'Trần Minh Tuấn',
+    role: 'reporter',
+    department: 'Phòng Sản xuất',
+  },
+  {
+    id: '5',
+    name: 'Hoàng Văn Nam',
+    role: 'technician',
+    department: 'Phòng Kỹ thuật',
+  },
+  {
+    id: '6',
+    name: 'Lê Thị Mai',
+    role: 'reporter',
+    department: 'Phòng Tin tức',
+  },
+  {
+    id: '7',
+    name: 'Nguyễn Đức Anh',
+    role: 'editor',
+    department: 'Phòng Sản xuất',
+  },
+  {
+    id: '8',
+    name: 'Trần Thị Bích',
+    role: 'technician',
+    department: 'Phòng Kỹ thuật',
+  },
 ]

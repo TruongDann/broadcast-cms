@@ -7,11 +7,11 @@ import {
   FileDown,
   AlertTriangle,
 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AssignmentTable } from './components/assignment-table'
 import { mockAssignments, getAssignmentStats } from './data/mock-data'
 import { type Assignment } from './types'
@@ -104,7 +104,10 @@ export function AssignmentsPage() {
     const now = new Date()
     const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
     return mockAssignments.filter(
-      (a) => a.deadline >= now && a.deadline <= weekFromNow && a.status !== 'completed'
+      (a) =>
+        a.deadline >= now &&
+        a.deadline <= weekFromNow &&
+        a.status !== 'completed'
     )
   }, [])
 
@@ -133,7 +136,9 @@ export function AssignmentsPage() {
       {/* Page Header - matching Topics page style */}
       <div className='flex flex-wrap items-end justify-between gap-2'>
         <div className='flex flex-col items-start'>
-          <h2 className='text-3xl font-bold tracking-tight'>Quản Lý Đơn Hàng</h2>
+          <h2 className='text-3xl font-bold tracking-tight'>
+            Quản Lý Đơn Hàng
+          </h2>
           <p className='text-muted-foreground'>
             Phân công và theo dõi tiến độ thực hiện các đề tài, đơn hàng.
           </p>
@@ -155,12 +160,16 @@ export function AssignmentsPage() {
         <Alert className='border-yellow-500/50 bg-yellow-500/10'>
           <AlertTriangle className='h-4 w-4 text-yellow-500' />
           <AlertDescription className='flex items-center gap-4'>
-            <span className='font-medium text-yellow-500'>Cảnh báo hạn chót</span>
-            <span>
-              Có <strong>{deadlineWarnings.length}</strong> đơn hàng sắp đến hạn nghiệm thu trong tuần này và{' '}
-              <strong>{overduePayments.length}</strong> đơn hàng quá hạn thanh toán.
+            <span className='font-medium text-yellow-500'>
+              Cảnh báo hạn chót
             </span>
-            <Button variant='link' className='text-yellow-500 p-0 h-auto'>
+            <span>
+              Có <strong>{deadlineWarnings.length}</strong> đơn hàng sắp đến hạn
+              nghiệm thu trong tuần này và{' '}
+              <strong>{overduePayments.length}</strong> đơn hàng quá hạn thanh
+              toán.
+            </span>
+            <Button variant='link' className='h-auto p-0 text-yellow-500'>
               Xem chi tiết
             </Button>
           </AlertDescription>

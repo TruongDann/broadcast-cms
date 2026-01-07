@@ -14,7 +14,7 @@ interface StatusBadgeProps {
 
 export function AssignmentStatusBadge({ status }: StatusBadgeProps) {
   const config = ASSIGNMENT_STATUS_CONFIG[status]
-  
+
   return (
     <Badge
       variant='outline'
@@ -31,7 +31,7 @@ interface ServiceTypeBadgeProps {
 
 export function ServiceTypeBadge({ serviceType }: ServiceTypeBadgeProps) {
   const config = SERVICE_TYPE_CONFIG[serviceType]
-  
+
   return (
     <Badge
       variant='outline'
@@ -48,7 +48,7 @@ interface PriorityBadgeProps {
 
 export function PriorityBadge({ priority }: PriorityBadgeProps) {
   const config = PRIORITY_CONFIG[priority]
-  
+
   return (
     <Badge
       variant='outline'
