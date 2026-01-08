@@ -124,8 +124,8 @@ export const sidebarData: SidebarData = {
       title: 'Điều hành',
       items: [
         {
-          title: 'Phân công',
-          url: '/operations/assignments',
+          title: 'Tin bài',
+          url: '/operations/articles',
           icon: Users,
           roles: ['leadership', 'admin'],
         },

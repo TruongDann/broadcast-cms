@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import {
   Plus,
   TrendingUp,
@@ -12,9 +13,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AssignmentTable } from './components/assignment-table'
-import { mockAssignments, getAssignmentStats } from './data/mock-data'
-import { type Assignment } from './types'
+import { ArticleTable } from './components/article-table'
+import {
+  mockArticles,
+  getArticleStats,
+  getArticlesByType,
+} from './data/mock-data'
+import { type Article, type ArticleType } from './types'
 
 // Stat card component - matching Topics page style
 interface StatCardProps {
@@ -77,58 +82,62 @@ function StatCard({ title, value, subtitle, trend, trendText }: StatCardProps) {
   )
 }
 
-export function AssignmentsPage() {
+export function ArticlesPage() {
   const [selectedTab, setSelectedTab] = useState<string>('all')
 
   // Get statistics
-  const stats = getAssignmentStats()
+  const stats = getArticleStats()
 
-  // Get assignments by tab filter
-  const getAssignmentsByTab = (tab: string): Assignment[] => {
+  // Get articles by tab filter (by article type)
+  const getArticlesByTab = (tab: string): Article[] => {
     switch (tab) {
-      case 'pending':
-        return mockAssignments.filter((a) => a.status === 'pending')
-      case 'in_progress':
-        return mockAssignments.filter((a) => a.status === 'in_progress')
-      case 'completed':
-        return mockAssignments.filter((a) => a.status === 'completed')
-      case 'overdue':
-        return mockAssignments.filter((a) => a.status === 'overdue')
+      case 'ptth':
+        return getArticlesByType('ptth')
+      case 'bao_in':
+        return getArticlesByType('bao_in')
+      case 'bao_dien_tu':
+        return getArticlesByType('bao_dien_tu')
+      case 'noi_dung_so':
+        return getArticlesByType('noi_dung_so')
       default:
-        return mockAssignments
+        return mockArticles
     }
   }
 
-  // Calculate warnings
+  // Calculate warnings - articles approaching deadline
   const deadlineWarnings = useMemo(() => {
     const now = new Date()
     const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-    return mockAssignments.filter(
+    return mockArticles.filter(
       (a) =>
         a.deadline >= now &&
         a.deadline <= weekFromNow &&
-        a.status !== 'completed'
+        a.status !== 'da_xuat_ban'
     )
   }, [])
 
-  const overduePayments = useMemo(() => {
-    return mockAssignments.filter((a) => a.status === 'overdue')
+  // Articles pending approval
+  const pendingApproval = useMemo(() => {
+    return mockArticles.filter(
+      (a) => a.status === 'cho_duyet_cap_1' || a.status === 'cho_duyet_cap_2'
+    )
   }, [])
 
-  const handleView = (_assignment: Assignment) => {
-    // TODO: Open detail modal
+  const navigate = useNavigate()
+
+  const handleView = (article: Article) => {
+    navigate({
+      to: '/operations/articles/$articleId',
+      params: { articleId: article.id },
+    })
   }
 
-  const handleEdit = (_assignment: Assignment) => {
+  const handleEdit = (_article: Article) => {
     // TODO: Implement edit
   }
 
-  const handleDelete = (_assignment: Assignment) => {
+  const handleDelete = (_article: Article) => {
     // TODO: Implement delete
-  }
-
-  const handleAssign = (_assignment: Assignment) => {
-    // TODO: Implement assign
   }
 
   return (
@@ -136,11 +145,10 @@ export function AssignmentsPage() {
       {/* Page Header - matching Topics page style */}
       <div className='flex flex-wrap items-end justify-between gap-2'>
         <div className='flex flex-col items-start'>
-          <h2 className='text-3xl font-bold tracking-tight'>
-            Quản Lý Đơn Hàng
-          </h2>
+          <h2 className='text-3xl font-bold tracking-tight'>Quản Lý Tin Bài</h2>
           <p className='text-muted-foreground'>
-            Phân công và theo dõi tiến độ thực hiện các đề tài, đơn hàng.
+            Quản lý quy trình sản xuất tin bài từ phân công đến xuất bản (PTTH,
+            Báo in, Báo điện tử, Nội dung số).
           </p>
         </div>
         <div className='flex gap-2'>
@@ -150,24 +158,23 @@ export function AssignmentsPage() {
           </Button>
           <Button>
             <Plus className='mr-2 h-4 w-4' />
-            Tạo đơn hàng mới
+            Tạo tin bài mới
           </Button>
         </div>
       </div>
 
       {/* Warning Alert */}
-      {(deadlineWarnings.length > 0 || overduePayments.length > 0) && (
+      {(deadlineWarnings.length > 0 || pendingApproval.length > 0) && (
         <Alert className='border-yellow-500/50 bg-yellow-500/10'>
           <AlertTriangle className='h-4 w-4 text-yellow-500' />
           <AlertDescription className='flex items-center gap-4'>
             <span className='font-medium text-yellow-500'>
-              Cảnh báo hạn chót
+              Cảnh báo deadline
             </span>
             <span>
-              Có <strong>{deadlineWarnings.length}</strong> đơn hàng sắp đến hạn
-              nghiệm thu trong tuần này và{' '}
-              <strong>{overduePayments.length}</strong> đơn hàng quá hạn thanh
-              toán.
+              Có <strong>{deadlineWarnings.length}</strong> tin bài sắp đến hạn
+              trong tuần này và <strong>{pendingApproval.length}</strong> tin
+              bài chờ duyệt.
             </span>
             <Button variant='link' className='h-auto p-0 text-yellow-500'>
               Xem chi tiết
@@ -177,57 +184,64 @@ export function AssignmentsPage() {
       )}
 
       {/* Stats Cards - matching Topics page style */}
-      <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
+      <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-5'>
         <StatCard
-          title='Chờ phân công'
-          value={String(stats.pending).padStart(2, '0')}
-          subtitle='Đơn hàng cần xử lý'
-          trend={{ value: 15, isPositive: false }}
-          trendText='Giảm 15% tuần qua'
+          title='Đang tác nghiệp'
+          value={String(stats.tacNghiep).padStart(2, '0')}
+          subtitle='PV/BTV đang thu thập tin'
+          trend={{ value: 15, isPositive: true }}
+          trendText='Tăng 15% tuần qua'
         />
         <StatCard
-          title='Đang thực hiện'
-          value={String(stats.inProgress).padStart(2, '0')}
-          subtitle='Đang triển khai'
-          trend={{ value: 8, isPositive: true }}
-          trendText='Tăng 8% so với hôm qua'
+          title='Chờ duyệt cấp 1'
+          value={String(stats.choDuyetCap1).padStart(2, '0')}
+          subtitle='Chờ lãnh đạo phòng duyệt'
+          trend={{ value: 8, isPositive: false }}
+          trendText='Giảm 8% so với hôm qua'
         />
         <StatCard
-          title='Quá hạn'
-          value={String(stats.overdue).padStart(2, '0')}
-          subtitle='Cần xử lý ngay'
-          trend={{ value: 25, isPositive: false }}
-          trendText='Cần chú ý giảm thiểu'
+          title='Chờ duyệt cấp 2'
+          value={String(stats.choDuyetCap2).padStart(2, '0')}
+          subtitle='Chờ Ban biên tập duyệt'
+          trend={{ value: 5, isPositive: false }}
+          trendText='Cần xử lý nhanh'
         />
         <StatCard
-          title='Hoàn thành'
-          value={String(stats.completed).padStart(2, '0')}
-          subtitle='Đã nghiệm thu'
+          title='Đang xử lý hậu kỳ'
+          value={String(stats.hauKy).padStart(2, '0')}
+          subtitle='Dựng video/Dàn trang'
+          trend={{ value: 12, isPositive: true }}
+          trendText='Đang trong tiến độ'
+        />
+        <StatCard
+          title='Đã xuất bản'
+          value={String(stats.daXuatBan).padStart(2, '0')}
+          subtitle='Phát sóng/In/Đăng tải'
           trend={{ value: 12.5, isPositive: true }}
           trendText='Tăng trưởng tốt'
         />
       </div>
 
-      {/* Assignments Table Section - matching Topics page style */}
+      {/* Articles Table Section - Quản lý theo loại tin bài */}
       <Card>
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
           <CardHeader className='pb-3'>
             <div className='flex items-center justify-between'>
               <TabsList>
                 <TabsTrigger value='all'>
-                  Tất cả ({mockAssignments.length})
+                  Tất cả ({mockArticles.length})
                 </TabsTrigger>
-                <TabsTrigger value='pending'>
-                  Chờ phân công ({getAssignmentsByTab('pending').length})
+                <TabsTrigger value='ptth'>
+                  PTTH ({stats.byType.ptth})
                 </TabsTrigger>
-                <TabsTrigger value='in_progress'>
-                  Đang thực hiện ({getAssignmentsByTab('in_progress').length})
+                <TabsTrigger value='bao_in'>
+                  Báo in ({stats.byType.baoIn})
                 </TabsTrigger>
-                <TabsTrigger value='completed'>
-                  Hoàn thành ({getAssignmentsByTab('completed').length})
+                <TabsTrigger value='bao_dien_tu'>
+                  Báo điện tử ({stats.byType.baoDienTu})
                 </TabsTrigger>
-                <TabsTrigger value='overdue'>
-                  Quá hạn ({getAssignmentsByTab('overdue').length})
+                <TabsTrigger value='noi_dung_so'>
+                  Nội dung số ({stats.byType.noiDungSo})
                 </TabsTrigger>
               </TabsList>
               <div className='flex items-center gap-2'>
@@ -237,55 +251,50 @@ export function AssignmentsPage() {
                 </Button>
                 <Button size='sm'>
                   <Plus className='mr-2 h-4 w-4' />
-                  Tạo đơn hàng mới
+                  Tạo tin bài mới
                 </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent className='pt-0'>
             <TabsContent value='all' className='mt-0'>
-              <AssignmentTable
-                data={getAssignmentsByTab('all')}
+              <ArticleTable
+                data={getArticlesByTab('all')}
                 onView={handleView}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onAssign={handleAssign}
               />
             </TabsContent>
-            <TabsContent value='pending' className='mt-0'>
-              <AssignmentTable
-                data={getAssignmentsByTab('pending')}
+            <TabsContent value='ptth' className='mt-0'>
+              <ArticleTable
+                data={getArticlesByTab('ptth')}
                 onView={handleView}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onAssign={handleAssign}
               />
             </TabsContent>
-            <TabsContent value='in_progress' className='mt-0'>
-              <AssignmentTable
-                data={getAssignmentsByTab('in_progress')}
+            <TabsContent value='bao_in' className='mt-0'>
+              <ArticleTable
+                data={getArticlesByTab('bao_in')}
                 onView={handleView}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onAssign={handleAssign}
               />
             </TabsContent>
-            <TabsContent value='completed' className='mt-0'>
-              <AssignmentTable
-                data={getAssignmentsByTab('completed')}
+            <TabsContent value='bao_dien_tu' className='mt-0'>
+              <ArticleTable
+                data={getArticlesByTab('bao_dien_tu')}
                 onView={handleView}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onAssign={handleAssign}
               />
             </TabsContent>
-            <TabsContent value='overdue' className='mt-0'>
-              <AssignmentTable
-                data={getAssignmentsByTab('overdue')}
+            <TabsContent value='noi_dung_so' className='mt-0'>
+              <ArticleTable
+                data={getArticlesByTab('noi_dung_so')}
                 onView={handleView}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onAssign={handleAssign}
               />
             </TabsContent>
           </CardContent>
@@ -295,4 +304,4 @@ export function AssignmentsPage() {
   )
 }
 
-export default AssignmentsPage
+export default ArticlesPage
